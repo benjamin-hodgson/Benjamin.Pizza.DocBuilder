@@ -1,0 +1,18 @@
+<Project>
+    <PropertyGroup>
+        <Authors>benjamin.hodgson</Authors>
+        <Copyright>© Benjamin Hodgson, 2017-2022</Copyright>
+        <Description>UNDEFINED</Description>
+        <PackageTags>UNDEFINED</PackageTags>
+
+        <PackageProjectUrl>UNDEFINED</PackageProjectUrl>
+        <RepositoryUrl>UNDEFINED</RepositoryUrl>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+        <Nullable>enable</Nullable>
+
+        <AssemblyOriginatorKeyFile>UNDEFINED</AssemblyOriginatorKeyFile>
+
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+</Project>

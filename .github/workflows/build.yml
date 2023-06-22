@@ -1,0 +1,19 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - v*
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+
+jobs:
+  build:
+    uses: benjamin-hodgson/BuildScripts/.github/workflows/dotnet.yml@main
+    with:
+      DOCS_FOLDER: UNDEFINED
+    secrets:
+      NUGET_KEY: ${{ secrets.NUGET_KEY }}
