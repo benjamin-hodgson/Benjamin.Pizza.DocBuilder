@@ -1,17 +1,17 @@
 <Project>
     <PropertyGroup>
         <Authors>benjamin.hodgson</Authors>
-        <Copyright>© Benjamin Hodgson, 2017-2022</Copyright>
-        <Description>UNDEFINED</Description>
-        <PackageTags>UNDEFINED</PackageTags>
+        <Copyright>© Benjamin Hodgson, 2023</Copyright>
+        <Description>Static doc site generator for my own use</Description>
+        <PackageTags>documentation;static-site</PackageTags>
 
-        <PackageProjectUrl>UNDEFINED</PackageProjectUrl>
-        <RepositoryUrl>UNDEFINED</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/benjamin-hodgson/Benjamin.Pizza.DocBuilder</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/benjamin-hodgson/Benjamin.Pizza.DocBuilder.git</RepositoryUrl>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
         <Nullable>enable</Nullable>
 
-        <AssemblyOriginatorKeyFile>UNDEFINED</AssemblyOriginatorKeyFile>
+        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)Benjamin.Pizza.DocBuilder.snk</AssemblyOriginatorKeyFile>
 
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     </PropertyGroup>
