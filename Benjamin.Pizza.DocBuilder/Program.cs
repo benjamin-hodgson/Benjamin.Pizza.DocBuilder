@@ -14,7 +14,7 @@ builder.Services.AddTransient<IReferenceLoader, MicrosoftXRefReferenceLoader>();
 builder.Services.AddTransient<Func<Documentation, IReferenceLoader>>(s => d =>
     new ChainedReferenceLoader(
         new LocalReferenceLoader(d, s.GetRequiredService<ILogger<LocalReferenceLoader>>()),
-        new CachedReferenceLoader(s.GetRequiredService<IReferenceLoader>()))
+        new CachedReferenceLoader(s.GetRequiredService<IReferenceLoader>(), s.GetRequiredService<ILogger<CachedReferenceLoader>>()))
 );
 builder.Services.AddTransient<ReferenceResolver>();
 
@@ -27,8 +27,13 @@ var documentation = Documentation.FromAssemblies(assemblies.Assemblies);
 var xrefResolver = app.Services.GetRequiredService<ReferenceResolver>();
 documentation = await xrefResolver.ResolveAllReferences(documentation).ConfigureAwait(false);
 
-Directory.Delete("_site", true);
+if (Directory.Exists("_site"))
+{
+    Directory.Delete("_site", true);
+}
+
 Directory.CreateDirectory("_site");
+
 foreach (var page in documentation.Pages)
 {
     await File.WriteAllTextAsync(

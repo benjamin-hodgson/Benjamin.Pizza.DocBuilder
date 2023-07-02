@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 using Sawmill;
@@ -24,16 +23,21 @@ internal sealed record Documentation(ImmutableArray<DocumentationPage> Pages, Im
 
     public static Documentation FromAssemblies(IEnumerable<(Assembly, XmlDocFile)> assemblies)
     {
-        var pages = assemblies
-            .SelectMany(asm => asm.Item1
-                .GetExportedTypes()
-                .Select(ty => DocumentationPage.Create(ty, asm.Item2))
-            )
-            .ToImmutableArray();
+        var typePages = (
+            from tup in assemblies
+            from ty in tup.Item1.GetExportedTypes()
+            select DocumentationPage.Create(ty, tup.Item2)
+        ).ToList();
 
-        var xrefs = pages.SelectMany(p => p.ContainedReferences).ToImmutableDictionary();
+        var nsPages =
+            from tup in assemblies
+            from ty in tup.Item1.GetExportedTypes()
+            group (ty, tup.Item2.GetDoc(ty)) by ty.Namespace into g
+            select DocumentationPage.Create(g);
 
-        return new Documentation(pages, xrefs);
+        var xrefs = typePages.SelectMany(t => t.ContainedReferences).ToImmutableDictionary();
+
+        return new Documentation(typePages.Concat(nsPages).ToImmutableArray(), xrefs);
     }
 }
 
@@ -46,10 +50,15 @@ internal sealed record DocumentationPage(
 {
     public static DocumentationPage Create(Type type, XmlDocFile doc)
     {
-        var url = new Uri(UrlExtensions.UrlFriendlyName(type.FullName!) + ".html", UriKind.Relative);
+        var url = new Uri(type.UrlFriendlyName() + ".html", UriKind.Relative);
         var title = type.FriendlyName();
+        var isDelegate = type.BaseType?.FullName == "System.MulticastDelegate";
 
-        var methods = type.BaseType?.FullName == "System.MulticastDelegate"
+        var ctors = isDelegate
+            ? Array.Empty<ConstructorInfo>()
+            : type.GetConstructors();
+
+        var methods = isDelegate
             ? Array.Empty<MethodInfo>()
             : type
                 .GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
@@ -64,20 +73,28 @@ internal sealed record DocumentationPage(
         var xrefs = methods
             .Select(m => KeyValuePair.Create(
                 Xref.Create(m),
-                new Reference.Resolved(m.Name, new Uri(url + "#" + UrlExtensions.UrlFriendlyName(m.Name), UriKind.Relative))))
+                new Reference.Resolved(m.Name, new Uri(url + "#" + m.UrlFriendlyName(), UriKind.Relative))))
             .Concat(properties.Select(p => KeyValuePair.Create(
                 Xref.Create(p),
-                new Reference.Resolved(p.Name, new Uri(url + "#" + UrlExtensions.UrlFriendlyName(p.Name), UriKind.Relative))))
+                new Reference.Resolved(p.Name, new Uri(url + "#" + p.UrlFriendlyName(), UriKind.Relative))))
             )
             .Prepend(KeyValuePair.Create(Xref.Create(type), new Reference.Resolved(title, url)))
             .ToImmutableDictionary();
 
-        var summarySection = doc.GetDoc(type)
-                .Element("summary")
-                ?.Nodes()
-                .Select(Markup.FromXml)
-                .Prepend(new Markup.SectionHeader("Summary", 2, "summary"))
-                ?? Enumerable.Empty<Markup>();
+        var typeDoc = doc.GetDoc(type);
+        var summarySection = typeDoc
+            .Element("summary")
+            ?.Nodes()
+            .Select(Markup.FromXml)
+            .Prepend(new Markup.SectionHeader("Summary", 2, "summary"))
+            .Concat(typeDoc.Elements("example").Select(Markup.FromXml).Prepend(new Markup.SectionHeader("Examples", 2, "examples")))
+            ?? Enumerable.Empty<Markup>();
+
+        var ctorsSection = ctors.Any()
+            ? ctors
+                .SelectMany(m => Method(m, doc))
+                .Prepend(new Markup.SectionHeader("Constructors", 2, "constructors"))
+            : Enumerable.Empty<Markup>();
 
         var methodsSection = methods.Any()
             ? methods
@@ -94,89 +111,83 @@ internal sealed record DocumentationPage(
         return new DocumentationPage(
             url,
             title,
-            new Markup.Seq(summarySection.Concat(methodsSection).ToImmutableArray()),
+            new Markup.Seq(
+                summarySection
+                    .Concat(ctorsSection)
+                    .Concat(methodsSection)
+                    .Concat(propertiesSection)
+                    .ToImmutableArray()
+            ),
             xrefs
         );
     }
 
-    private static IEnumerable<Markup> Method(MethodBase meth, XmlDocFile doc)
+    public static DocumentationPage Create(IGrouping<string, (Type, XElement)> g)
     {
-        return doc.GetDoc(meth)
+        var url = new Uri(UrlExtensions.MakeUrlFriendly(g.Key) + ".html", UriKind.Relative);
+
+        var classes = g
+            .Where(tup => tup.Item1.IsClass)
+            .SelectMany(tup =>
+                (tup.Item2.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
+                    .Select(Markup.FromXml)
+                    .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(tup.Item1))), 3, null)))
+            .PrependIfNotEmpty(new Markup.SectionHeader("Classes", 1, "classes"));
+
+        var interfaces = g
+            .Where(tup => tup.Item1.IsInterface)
+            .SelectMany(tup =>
+                (tup.Item2.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
+                    .Select(Markup.FromXml)
+                    .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(tup.Item1))), 3, null)))
+            .PrependIfNotEmpty(new Markup.SectionHeader("Interfaces", 1, "interfaces"));
+
+        var enums = g
+            .Where(tup => tup.Item1.IsEnum)
+            .SelectMany(tup =>
+                (tup.Item2.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
+                    .Select(Markup.FromXml)
+                    .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(tup.Item1))), 3, null)))
+            .PrependIfNotEmpty(new Markup.SectionHeader("Enums", 1, "enums"));
+
+        var structs = g
+            .Where(tup => tup.Item1.IsValueType && !tup.Item1.IsEnum)
+            .SelectMany(tup =>
+                (tup.Item2.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
+                    .Select(Markup.FromXml)
+                    .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(tup.Item1))), 3, null)))
+            .PrependIfNotEmpty(new Markup.SectionHeader("Structs", 1, "structs"));
+
+        return new DocumentationPage(
+            url,
+            g.Key,
+            new Markup.Seq(classes.Concat(interfaces).Concat(enums).Concat(structs).ToImmutableArray()),
+            ImmutableDictionary<Xref, Reference.Resolved>.Empty);
+    }
+
+    private static IEnumerable<Markup> Method(MethodBase meth, XmlDocFile docFile)
+    {
+        var ret = (meth as MethodInfo)?.ReturnType.FriendlyName();
+        var declaration = string.IsNullOrEmpty(ret)
+            ? meth.FriendlyName()
+            : ret + " " + meth.FriendlyName();
+
+        return docFile.GetDoc(meth)
             .Element("summary")
             ?.Nodes()
             .Select(Markup.FromXml)
+            .Append(new Markup.Seq(new Markup.SectionHeader("Declaration", 4, null), new Markup.CodeBlock(declaration)))
+            .Prepend(new Markup.SectionHeader(meth.FriendlyName(), 3, meth.UrlFriendlyName()))
             ?? Enumerable.Empty<Markup>();
     }
 
-    private static IEnumerable<Markup> Property(PropertyInfo prop, XmlDocFile doc)
+    private static IEnumerable<Markup> Property(PropertyInfo prop, XmlDocFile docFile)
     {
-        return doc.GetDoc(prop)
+        return docFile.GetDoc(prop)
             .Element("summary")
             ?.Nodes()
             .Select(Markup.FromXml)
+            .Prepend(new Markup.SectionHeader(prop.FriendlyName(), 3, prop.UrlFriendlyName()))
             ?? Enumerable.Empty<Markup>();
     }
-}
-
-internal abstract partial record Markup : IRewritable<Markup>
-{
-    public sealed record Seq(ImmutableArray<Markup> Values) : Markup;
-    public sealed record SectionHeader(string Title, int Level, string Id) : Markup;
-    public sealed record Paragraph(Markup Content) : Markup;
-    public sealed record Text(string Value) : Markup;
-    public sealed record Link(Reference Reference) : Markup;
-    public sealed record InlineCode(string Code) : Markup;
-
-    public static Markup FromXml(XNode node)
-        => node switch
-        {
-            XText t => new Text(Whitespaces().Replace(t.Value, " ")),
-            XElement e => e.Name.LocalName switch
-            {
-                "see" => new Link(new Reference.Unresolved(Xref.FromCref(e))),
-                "para" => new Paragraph(new Seq(e.Elements().Select(FromXml).ToImmutableArray())),
-                "c" => new InlineCode(((XText)e.FirstNode!).Value),
-                "paramref" or "typeparamref" => new InlineCode(e.Attribute("name")!.Value),
-                var n => new Text("???" + n)
-            },
-            var n => new Text($"???{n.NodeType}")
-        };
-
-    public int CountChildren()
-        => this switch
-        {
-            Seq(var children) => children.Length,
-            Paragraph => 1,
-            _ => 0
-        };
-
-    public void GetChildren(Span<Markup> childrenReceiver)
-    {
-        switch (this)
-        {
-            case Seq(var children):
-                children.CopyTo(childrenReceiver);
-                break;
-            case Paragraph(var content):
-                childrenReceiver[0] = content;
-                break;
-        }
-    }
-
-    public Markup SetChildren(ReadOnlySpan<Markup> newChildren)
-        => this switch
-        {
-            Seq s => s with { Values = newChildren.ToImmutableArray() },
-            Paragraph p => p with { Content = newChildren[0] },
-            _ => this
-        };
-    [GeneratedRegex("\\s+")]
-    private static partial Regex Whitespaces();
-}
-
-internal abstract record Reference
-{
-    public sealed record Unresolved(Xref Xref) : Reference;
-
-    public sealed record Resolved(string Title, Uri Url) : Reference;
 }

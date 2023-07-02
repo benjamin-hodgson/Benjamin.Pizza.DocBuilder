@@ -28,10 +28,12 @@ internal static class HtmlRenderer
             Markup.Seq => _(children.ToArray()),
             Markup.Paragraph(var content) => p_(children[0]),
             Markup.Text(var t) => Text(t),
-            Markup.SectionHeader(var title, var level, var id) => Tag("h" + level, new Attr("id", id))._(title),
+            Markup.SectionHeader(_, var level, null) => Tag("h" + level)._(children[0]),
+            Markup.SectionHeader(_, var level, var id) => Tag("h" + level, new Attr("id", id))._(children[0]),
             Markup.Link(Reference.Resolved(var t, var href)) => a(href: href.ToString())._(t),
             Markup.Link(Reference.Unresolved(Xref(var xref))) => a(href: xref, style: "color: red")._(xref),
             Markup.InlineCode(var code) => code_(code),
+            Markup.CodeBlock(var code) => pre_(code_(code)),
             _ => throw new ArgumentOutOfRangeException(nameof(markup), item, "Unknown markup")
         });
 }

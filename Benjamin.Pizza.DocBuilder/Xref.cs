@@ -70,7 +70,7 @@ internal partial record struct Xref(string Value)
     }
 
     private static string GetXref(MemberInfo member, char prefix)
-        => prefix + ':' + GetTypeXrefName(member.DeclaringType!) + '.' + member.Name;
+        => $"{prefix}:{GetTypeXrefName(member.DeclaringType!)}.{member.Name}";
 
     private static string GetTypeXrefName(Type type)
     {

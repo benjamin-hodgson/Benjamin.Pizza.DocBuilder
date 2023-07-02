@@ -13,10 +13,12 @@ internal interface IReferenceLoader
 internal sealed class MicrosoftXRefReferenceLoader : IReferenceLoader
 {
     private readonly HttpClient _client;
+    private readonly ILogger<MicrosoftXRefReferenceLoader> _logger;
 
-    public MicrosoftXRefReferenceLoader(HttpClient client)
+    public MicrosoftXRefReferenceLoader(HttpClient client, ILogger<MicrosoftXRefReferenceLoader> logger)
     {
         _client = client;
+        _logger = logger;
     }
 
     public async Task<Reference.Resolved?> Load(Xref xref)
@@ -32,8 +34,11 @@ internal sealed class MicrosoftXRefReferenceLoader : IReferenceLoader
 
         if (json!.RootElement.GetArrayLength() == 0)
         {
+            _logger.LogWarning("Couldn't get xref {Xref} from remote", xref.Value);
             return null;
         }
+
+        _logger.LogInformation("Got xref {Xref} from remote", xref.Value);
 
         return new Reference.Resolved(
             json!.RootElement[0].GetProperty("name").GetString()!,
@@ -44,17 +49,20 @@ internal sealed class MicrosoftXRefReferenceLoader : IReferenceLoader
 internal sealed class CachedReferenceLoader : IReferenceLoader
 {
     private readonly IReferenceLoader _underlying;
+    private readonly ILogger<CachedReferenceLoader> _logger;
     private readonly Dictionary<Xref, Reference.Resolved?> _cache = new();
 
-    public CachedReferenceLoader(IReferenceLoader underlying)
+    public CachedReferenceLoader(IReferenceLoader underlying, ILogger<CachedReferenceLoader> logger)
     {
         _underlying = underlying;
+        _logger = logger;
     }
 
     public async Task<Reference.Resolved?> Load(Xref xref)
     {
         if (_cache.TryGetValue(xref, out var result))
         {
+            _logger.LogInformation("Found xref {Xref} in cache", xref.Value);
             return result;
         }
 
