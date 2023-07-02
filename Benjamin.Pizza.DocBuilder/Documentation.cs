@@ -78,8 +78,8 @@ internal sealed record DocumentationPage(
                 Xref.Create(p),
                 new Reference.Resolved(p.Name, new Uri(url + "#" + p.UrlFriendlyName(), UriKind.Relative))))
             )
-            .Prepend(KeyValuePair.Create(Xref.Create(type), new Reference.Resolved(title, url)))
-            .ToImmutableDictionary();
+            .ToImmutableDictionary()
+            .Add(Xref.Create(type), new Reference.Resolved(title, url));
 
         var typeDoc = doc.GetDoc(type);
         var summarySection = typeDoc
@@ -90,23 +90,17 @@ internal sealed record DocumentationPage(
             .Concat(typeDoc.Elements("example").Select(Markup.FromXml).Prepend(new Markup.SectionHeader("Examples", 2, "examples")))
             ?? Enumerable.Empty<Markup>();
 
-        var ctorsSection = ctors.Any()
-            ? ctors
-                .SelectMany(m => Method(m, doc))
-                .Prepend(new Markup.SectionHeader("Constructors", 2, "constructors"))
-            : Enumerable.Empty<Markup>();
+        var ctorsSection = ctors
+            .SelectMany(m => Method(m, doc))
+            .PrependIfNotEmpty(new Markup.SectionHeader("Constructors", 2, "constructors"));
 
-        var methodsSection = methods.Any()
-            ? methods
-                .SelectMany(m => Method(m, doc))
-                .Prepend(new Markup.SectionHeader("Methods", 2, "methods"))
-            : Enumerable.Empty<Markup>();
+        var methodsSection = methods
+            .SelectMany(m => Method(m, doc))
+            .PrependIfNotEmpty(new Markup.SectionHeader("Methods", 2, "methods"));
 
-        var propertiesSection = properties.Any()
-            ? properties
-                .SelectMany(p => Property(p, doc))
-                .Prepend(new Markup.SectionHeader("Properties", 2, "properties"))
-            : Enumerable.Empty<Markup>();
+        var propertiesSection = properties
+            .SelectMany(p => Property(p, doc))
+            .PrependIfNotEmpty(new Markup.SectionHeader("Properties", 2, "properties"));
 
         return new DocumentationPage(
             url,
