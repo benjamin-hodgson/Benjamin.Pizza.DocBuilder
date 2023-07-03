@@ -26,7 +26,7 @@ internal static class HtmlRenderer
         => markup.Fold<Markup, Html>((children, item) => item switch
         {
             Markup.Seq => _(children.ToArray()),
-            Markup.Paragraph(var content) => p_(children[0]),
+            Markup.Paragraph => p_(children[0]),
             Markup.Text(var t) => Text(t),
             Markup.SectionHeader(_, var level, null) => Tag("h" + level)._(children[0]),
             Markup.SectionHeader(_, var level, var id) => Tag("h" + level, new Attr("id", id))._(children[0]),
@@ -34,6 +34,7 @@ internal static class HtmlRenderer
             Markup.Link(Reference.Unresolved(Xref(var xref))) => a(href: xref, style: "color: red")._(xref),
             Markup.InlineCode(var code) => code_(code),
             Markup.CodeBlock(var code) => pre_(code_(code)),
+            Markup.List => ul_(children.ToArray().Select(li_)),
             _ => throw new ArgumentOutOfRangeException(nameof(markup), item, "Unknown markup")
         });
 }

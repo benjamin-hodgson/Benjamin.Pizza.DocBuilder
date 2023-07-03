@@ -23,6 +23,7 @@ internal abstract partial record Markup : IRewritable<Markup>
     public sealed record Link(Reference Reference) : Markup;
     public sealed record InlineCode(string Code) : Markup;
     public sealed record CodeBlock(string Code) : Markup;
+    public sealed record List(ImmutableArray<Markup> Items) : Markup;
 
     public static Markup FromXml(XNode node)
         => node switch
@@ -62,6 +63,7 @@ internal abstract partial record Markup : IRewritable<Markup>
             Seq(var children) => children.Length,
             Paragraph => 1,
             SectionHeader => 1,
+            List(var children) => children.Length,
             _ => 0
         };
 
@@ -78,6 +80,9 @@ internal abstract partial record Markup : IRewritable<Markup>
             case SectionHeader(var text, _, _):
                 childrenReceiver[0] = text;
                 break;
+            case List(var children):
+                children.CopyTo(childrenReceiver);
+                break;
         }
     }
 
@@ -87,6 +92,7 @@ internal abstract partial record Markup : IRewritable<Markup>
             Seq s => s with { Values = newChildren.ToImmutableArray() },
             Paragraph p => p with { Content = newChildren[0] },
             SectionHeader s => s with { Title = newChildren[0] },
+            List l => l with { Items = newChildren.ToImmutableArray() },
             _ => this
         };
     [GeneratedRegex("\\s+")]

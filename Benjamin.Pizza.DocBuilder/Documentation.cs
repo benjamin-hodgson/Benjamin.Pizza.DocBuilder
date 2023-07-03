@@ -61,8 +61,30 @@ internal record DocumentationPage(
             ?.Nodes()
             .Select(Markup.FromXml)
             .Prepend(new Markup.SectionHeader("Summary", 2, "summary"))
-            .Concat(typeDoc.Elements("example").Select(Markup.FromXml).PrependIfNotEmpty(new Markup.SectionHeader("Examples", 2, "examples")))
             ?? Enumerable.Empty<Markup>();
+
+        var examplesSection = typeDoc
+            .Elements("example")
+            .Select(Markup.FromXml)
+            .PrependIfNotEmpty(new Markup.SectionHeader("Examples", 2, "examples"));
+
+        var remarksSection = typeDoc
+            .Element("remarks")
+            ?.Nodes()
+            .Select(Markup.FromXml)
+            .Prepend(new Markup.SectionHeader("Remarks", 2, "remarks"))
+            ?? Enumerable.Empty<Markup>();
+
+        var seeAlsoItems = typeDoc
+            .Elements("seealso")
+            .Select(e => new Markup.Link(new Reference.Unresolved(Xref.FromCref(e))))
+            .Cast<Markup>()
+            .ToImmutableArray();
+        var seeAlsoSection = seeAlsoItems.Length == 0
+            ? Enumerable.Empty<Markup>()
+            : ImmutableArray.Create<Markup>(
+                new Markup.SectionHeader("See Also", 2, "seealso"),
+                new Markup.List(seeAlsoItems));
 
         var (ctorRefs, ctorsSection) = Load(type, url, doc, new ConstructorDocumentationLoader());
         var (methodRefs, methodsSection) = Load(type, url, doc, new MethodDocumentationLoader());
@@ -74,10 +96,13 @@ internal record DocumentationPage(
             title,
             new Markup.Seq(
                 summarySection
+                    .Concat(remarksSection)
+                    .Concat(examplesSection)
                     .Concat(ctorsSection)
                     .Concat(methodsSection)
                     .Concat(propertiesSection)
                     .Concat(fieldsSection)
+                    .Concat(seeAlsoSection)
                     .ToImmutableArray()
             ),
             ImmutableDictionary<Xref, Reference.Resolved>
