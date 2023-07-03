@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Reflection;
-using System.Xml.Linq;
 
 using Sawmill;
 
@@ -23,25 +22,28 @@ internal sealed record Documentation(ImmutableArray<DocumentationPage> Pages, Im
 
     public static Documentation FromAssemblies(IEnumerable<(Assembly, XmlDocFile)> assemblies)
     {
-        var typePages = (
-            from tup in assemblies
-            from ty in tup.Item1.GetExportedTypes()
-            select DocumentationPage.Create(ty, tup.Item2)
-        ).ToList();
+        var pages = ImmutableArray.CreateBuilder<DocumentationPage>();
+        var xrefs = ImmutableDictionary.CreateBuilder<Xref, Reference.Resolved>();
+        foreach (var (asm, docFile) in assemblies)
+        {
+            foreach (var ty in asm.GetExportedTypes())
+            {
+                var page = DocumentationPage.Create(ty, docFile);
+                pages.Add(page);
+                xrefs.AddRange(page.ContainedReferences);
+            }
 
-        var nsPages =
-            from tup in assemblies
-            from ty in tup.Item1.GetExportedTypes()
-            group (ty, tup.Item2.GetDoc(ty)) by ty.Namespace into g
-            select DocumentationPage.Create(g);
+            foreach (var ns in asm.GetExportedTypes().GroupBy(t => t.Namespace).Where(g => g.Key != null))
+            {
+                pages.Add(NamespaceDocumentationPage.Create(ns!, docFile));
+            }
+        }
 
-        var xrefs = typePages.SelectMany(t => t.ContainedReferences).ToImmutableDictionary();
-
-        return new Documentation(typePages.Concat(nsPages).ToImmutableArray(), xrefs);
+        return new Documentation(pages.ToImmutable(), xrefs.ToImmutable());
     }
 }
 
-internal sealed record DocumentationPage(
+internal record DocumentationPage(
     Uri Url,
     string Title,
     Markup Body,
@@ -53,10 +55,6 @@ internal sealed record DocumentationPage(
         var url = new Uri(type.UrlFriendlyName() + ".html", UriKind.Relative);
         var title = type.FriendlyName();
 
-        var xrefs = ImmutableDictionary<Xref, Reference.Resolved>
-            .Empty
-            .Add(Xref.Create(type), new Reference.Resolved(title, url));
-
         var typeDoc = doc.GetDoc(type);
         var summarySection = typeDoc
             .Element("summary")
@@ -66,9 +64,9 @@ internal sealed record DocumentationPage(
             .Concat(typeDoc.Elements("example").Select(Markup.FromXml).Prepend(new Markup.SectionHeader("Examples", 2, "examples")))
             ?? Enumerable.Empty<Markup>();
 
-        var (ctorRefs, ctorsSection) = Load(type, url, doc, ConstructorDocumentationLoader.Instance);
-        var (methodRefs, methodsSection) = Load(type, url, doc, MethodDocumentationLoader.Instance);
-        var (propertyRefs, propertiesSection) = Load(type, url, doc, PropertyDocumentationLoader.Instance);
+        var (ctorRefs, ctorsSection) = Load(type, url, doc, new ConstructorDocumentationLoader());
+        var (methodRefs, methodsSection) = Load(type, url, doc, new MethodDocumentationLoader());
+        var (propertyRefs, propertiesSection) = Load(type, url, doc, new PropertyDocumentationLoader());
 
         return new DocumentationPage(
             url,
@@ -80,20 +78,22 @@ internal sealed record DocumentationPage(
                     .Concat(propertiesSection)
                     .ToImmutableArray()
             ),
-            xrefs
+            ImmutableDictionary<Xref, Reference.Resolved>
+                .Empty
+                .Add(Xref.Create(type), new Reference.Resolved(title, url))
                 .AddRange(ctorRefs)
                 .AddRange(methodRefs)
                 .AddRange(propertyRefs)
         );
     }
 
-    private static (ImmutableDictionary<Xref, Reference.Resolved>, IEnumerable<Markup>) Load<T>(
-        Type type,
+    protected static (ImmutableDictionary<Xref, Reference.Resolved>, IEnumerable<Markup>) Load<TContext, T>(
+        TContext type,
         Uri baseUrl,
         XmlDocFile doc,
-        IDocumentationSectionLoader<T> loader)
+        IDocumentationSectionLoader<TContext, T> loader)
     {
-        var refs = ImmutableDictionary<Xref, Reference.Resolved>.Empty;
+        var refs = ImmutableDictionary.CreateBuilder<Xref, Reference.Resolved>();
         var docs = ImmutableArray.CreateBuilder<Markup>();
 
         foreach (var item in loader.GetItems(type))
@@ -104,49 +104,41 @@ internal sealed record DocumentationPage(
             docs.AddRange(fragment.Markup);
         }
 
-        return (refs, docs.PrependIfNotEmpty(loader.SectionHeader));
+        return (refs.ToImmutable(), docs.PrependIfNotEmpty(loader.SectionHeader));
     }
+}
 
-    public static DocumentationPage Create(IGrouping<string, (Type, XElement)> g)
+internal sealed record NamespaceDocumentationPage(
+    Uri Url,
+    string Title,
+    Markup Body,
+    ImmutableDictionary<Xref, Reference.Resolved> ContainedReferences
+) : DocumentationPage(Url, Title, Body, ContainedReferences)
+{
+    public static DocumentationPage Create(IGrouping<string, Type> g, XmlDocFile doc)
     {
         var url = new Uri(UrlExtensions.MakeUrlFriendly(g.Key) + ".html", UriKind.Relative);
 
-        var classes = g
-            .Where(tup => tup.Item1.IsClass)
-            .SelectMany(tup =>
-                (tup.Item2.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
-                    .Select(Markup.FromXml)
-                    .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(tup.Item1))), 3, null)))
-            .PrependIfNotEmpty(new Markup.SectionHeader("Classes", 1, "classes"));
-
-        var interfaces = g
-            .Where(tup => tup.Item1.IsInterface)
-            .SelectMany(tup =>
-                (tup.Item2.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
-                    .Select(Markup.FromXml)
-                    .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(tup.Item1))), 3, null)))
-            .PrependIfNotEmpty(new Markup.SectionHeader("Interfaces", 1, "interfaces"));
-
-        var enums = g
-            .Where(tup => tup.Item1.IsEnum)
-            .SelectMany(tup =>
-                (tup.Item2.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
-                    .Select(Markup.FromXml)
-                    .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(tup.Item1))), 3, null)))
-            .PrependIfNotEmpty(new Markup.SectionHeader("Enums", 1, "enums"));
-
-        var structs = g
-            .Where(tup => tup.Item1.IsValueType && !tup.Item1.IsEnum)
-            .SelectMany(tup =>
-                (tup.Item2.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
-                    .Select(Markup.FromXml)
-                    .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(tup.Item1))), 3, null)))
-            .PrependIfNotEmpty(new Markup.SectionHeader("Structs", 1, "structs"));
+        // ignore the ContainedReferences as the namespace
+        // page is not the canonical source for the members
+        // of the namespace
+        var (_, classes) = Load(g, url, doc, new ClassDocumentationLoader());
+        var (_, interfaces) = Load(g, url, doc, new InterfaceDocumentationLoader());
+        var (_, delegates) = Load(g, url, doc, new DelegateDocumentationLoader());
+        var (_, enums) = Load(g, url, doc, new EnumDocumentationLoader());
+        var (_, structs) = Load(g, url, doc, new StructDocumentationLoader());
 
         return new DocumentationPage(
             url,
             g.Key,
-            new Markup.Seq(classes.Concat(interfaces).Concat(enums).Concat(structs).ToImmutableArray()),
+            new Markup.Seq(
+                classes
+                    .Concat(interfaces)
+                    .Concat(delegates)
+                    .Concat(enums)
+                    .Concat(structs)
+                    .ToImmutableArray()
+            ),
             ImmutableDictionary<Xref, Reference.Resolved>.Empty);
     }
 }

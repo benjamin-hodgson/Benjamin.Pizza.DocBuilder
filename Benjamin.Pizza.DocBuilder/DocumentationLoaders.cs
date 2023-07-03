@@ -3,20 +3,78 @@ using System.Xml.Linq;
 
 namespace Benjamin.Pizza.DocBuilder;
 
-internal interface IDocumentationSectionLoader<T>
+internal interface IDocumentationSectionLoader<TContext, TItem>
 {
     Markup.SectionHeader SectionHeader { get; }
-    IEnumerable<T> GetItems(Type type);
-    Xref GetXref(T item);
-    LoadedDocumentationFragment Load(T item, XElement docElement);
+    IEnumerable<TItem> GetItems(TContext ctx);
+    Xref GetXref(TItem item);
+    DocumentationFragment Load(TItem item, XElement docElement);
 }
 
-internal sealed record LoadedDocumentationFragment(
+internal sealed record DocumentationFragment(
     string Name,
     string UrlFragment,
     IEnumerable<Markup> Markup);
 
-internal abstract class MethodBaseDocumentationLoader<T> : IDocumentationSectionLoader<T>
+internal abstract class TypeDocumentationLoader : IDocumentationSectionLoader<IEnumerable<Type>, Type>
+{
+    public abstract Markup.SectionHeader SectionHeader { get; }
+
+    public abstract IEnumerable<Type> GetItems(IEnumerable<Type> ctx);
+
+    public Xref GetXref(Type type) => Xref.Create(type);
+
+    public DocumentationFragment Load(Type type, XElement docElement)
+        => new(
+            type.FriendlyName(),
+            type.UrlFriendlyName(),
+            (docElement.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
+                .Select(Markup.FromXml)
+                .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(type))), 3, null))
+        );
+}
+
+internal sealed class ClassDocumentationLoader : TypeDocumentationLoader
+{
+    public override Markup.SectionHeader SectionHeader => new("Classes", 2, "classes");
+
+    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
+        => types.Where(t => t.IsClass && !t.IsDelegate());
+}
+
+internal sealed class InterfaceDocumentationLoader : TypeDocumentationLoader
+{
+    public override Markup.SectionHeader SectionHeader => new("Interfaces", 2, "interfaces");
+
+    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
+        => types.Where(t => t.IsInterface);
+}
+
+internal sealed class DelegateDocumentationLoader : TypeDocumentationLoader
+{
+    public override Markup.SectionHeader SectionHeader => new("Delegates", 2, "delegates");
+
+    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
+        => types.Where(t => t.IsDelegate());
+}
+
+internal sealed class EnumDocumentationLoader : TypeDocumentationLoader
+{
+    public override Markup.SectionHeader SectionHeader => new("Enums", 2, "enums");
+
+    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
+        => types.Where(t => t.IsEnum);
+}
+
+internal sealed class StructDocumentationLoader : TypeDocumentationLoader
+{
+    public override Markup.SectionHeader SectionHeader => new("Structs", 2, "structs");
+
+    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
+        => types.Where(t => t.IsValueType && !t.IsEnum);
+}
+
+internal abstract class MethodBaseDocumentationLoader<T> : IDocumentationSectionLoader<Type, T>
     where T : MethodBase
 {
     public abstract Markup.SectionHeader SectionHeader { get; }
@@ -25,7 +83,7 @@ internal abstract class MethodBaseDocumentationLoader<T> : IDocumentationSection
 
     public Xref GetXref(T meth) => Xref.Create(meth);
 
-    public LoadedDocumentationFragment Load(T meth, XElement docElement)
+    public DocumentationFragment Load(T meth, XElement docElement)
         => new(
             meth.FriendlyName(),
             "#" + meth.UrlFriendlyName(),
@@ -40,27 +98,16 @@ internal abstract class MethodBaseDocumentationLoader<T> : IDocumentationSection
 
 internal sealed class ConstructorDocumentationLoader : MethodBaseDocumentationLoader<ConstructorInfo>
 {
-    private ConstructorDocumentationLoader()
-    {
-    }
-
     public override Markup.SectionHeader SectionHeader => new("Constructors", 2, "constructors");
 
     public override IEnumerable<ConstructorInfo> GetItems(Type type)
         => type.IsDelegate()
             ? Array.Empty<ConstructorInfo>()
             : type.GetConstructors();
-
-    public static IDocumentationSectionLoader<ConstructorInfo> Instance { get; }
-        = new ConstructorDocumentationLoader();
 }
 
 internal sealed class MethodDocumentationLoader : MethodBaseDocumentationLoader<MethodInfo>
 {
-    private MethodDocumentationLoader()
-    {
-    }
-
     public override Markup.SectionHeader SectionHeader => new("Methods", 2, "methods");
 
     public override IEnumerable<MethodInfo> GetItems(Type type)
@@ -70,17 +117,10 @@ internal sealed class MethodDocumentationLoader : MethodBaseDocumentationLoader<
                 .GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
                 .Where(m => !m.IsSpecialName)
                 .ToArray();
-
-    public static IDocumentationSectionLoader<MethodInfo> Instance { get; }
-        = new MethodDocumentationLoader();
 }
 
-internal sealed class PropertyDocumentationLoader : IDocumentationSectionLoader<PropertyInfo>
+internal sealed class PropertyDocumentationLoader : IDocumentationSectionLoader<Type, PropertyInfo>
 {
-    private PropertyDocumentationLoader()
-    {
-    }
-
     public Markup.SectionHeader SectionHeader => new("Properties", 2, "properties");
 
     public IEnumerable<PropertyInfo> GetItems(Type type)
@@ -90,7 +130,7 @@ internal sealed class PropertyDocumentationLoader : IDocumentationSectionLoader<
 
     public Xref GetXref(PropertyInfo property) => Xref.Create(property);
 
-    public LoadedDocumentationFragment Load(PropertyInfo property, XElement docElement)
+    public DocumentationFragment Load(PropertyInfo property, XElement docElement)
         => new(
             property.FriendlyName(),
             "#" + property.UrlFriendlyName(),
@@ -101,7 +141,4 @@ internal sealed class PropertyDocumentationLoader : IDocumentationSectionLoader<
                 ?? Enumerable.Empty<Markup>())
                 .Prepend(new Markup.SectionHeader(property.FriendlyName(), 3, property.UrlFriendlyName()))
         );
-
-    public static IDocumentationSectionLoader<PropertyInfo> Instance { get; }
-        = new PropertyDocumentationLoader();
 }
