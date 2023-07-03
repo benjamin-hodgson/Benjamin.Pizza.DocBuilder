@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Reflection;
 using System.Xml.Linq;
 
 namespace Benjamin.Pizza.DocBuilder;
@@ -12,10 +11,9 @@ internal sealed class XmlDocFile
         _members = members;
     }
 
-    public XElement GetDoc(Type type) => _members[Xref.Create(type)];
-    public XElement GetDoc(PropertyInfo prop) => _members[Xref.Create(prop)];
-    public XElement GetDoc(FieldInfo field) => _members[Xref.Create(field)];
-    public XElement GetDoc(MethodBase meth) => _members[Xref.Create(meth)];
+    public XElement GetDoc(Xref xref) => _members[xref];
+
+    public XElement GetDoc(Type type) => GetDoc(Xref.Create(type));
 
     public static XmlDocFile Load(string file)
     {

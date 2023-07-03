@@ -52,33 +52,9 @@ internal sealed record DocumentationPage(
     {
         var url = new Uri(type.UrlFriendlyName() + ".html", UriKind.Relative);
         var title = type.FriendlyName();
-        var isDelegate = type.BaseType?.FullName == "System.MulticastDelegate";
 
-        var ctors = isDelegate
-            ? Array.Empty<ConstructorInfo>()
-            : type.GetConstructors();
-
-        var methods = isDelegate
-            ? Array.Empty<MethodInfo>()
-            : type
-                .GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
-                .Where(m => !m.IsSpecialName)
-                .ToArray();
-
-        var properties = type
-                .GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
-                .Where(m => !m.IsSpecialName)
-                .ToArray();
-
-        var xrefs = methods
-            .Select(m => KeyValuePair.Create(
-                Xref.Create(m),
-                new Reference.Resolved(m.Name, new Uri(url + "#" + m.UrlFriendlyName(), UriKind.Relative))))
-            .Concat(properties.Select(p => KeyValuePair.Create(
-                Xref.Create(p),
-                new Reference.Resolved(p.Name, new Uri(url + "#" + p.UrlFriendlyName(), UriKind.Relative))))
-            )
-            .ToImmutableDictionary()
+        var xrefs = ImmutableDictionary<Xref, Reference.Resolved>
+            .Empty
             .Add(Xref.Create(type), new Reference.Resolved(title, url));
 
         var typeDoc = doc.GetDoc(type);
@@ -90,17 +66,9 @@ internal sealed record DocumentationPage(
             .Concat(typeDoc.Elements("example").Select(Markup.FromXml).Prepend(new Markup.SectionHeader("Examples", 2, "examples")))
             ?? Enumerable.Empty<Markup>();
 
-        var ctorsSection = ctors
-            .SelectMany(m => Method(m, doc))
-            .PrependIfNotEmpty(new Markup.SectionHeader("Constructors", 2, "constructors"));
-
-        var methodsSection = methods
-            .SelectMany(m => Method(m, doc))
-            .PrependIfNotEmpty(new Markup.SectionHeader("Methods", 2, "methods"));
-
-        var propertiesSection = properties
-            .SelectMany(p => Property(p, doc))
-            .PrependIfNotEmpty(new Markup.SectionHeader("Properties", 2, "properties"));
+        var (ctorRefs, ctorsSection) = Load(type, url, doc, ConstructorDocumentationLoader.Instance);
+        var (methodRefs, methodsSection) = Load(type, url, doc, MethodDocumentationLoader.Instance);
+        var (propertyRefs, propertiesSection) = Load(type, url, doc, PropertyDocumentationLoader.Instance);
 
         return new DocumentationPage(
             url,
@@ -113,7 +81,30 @@ internal sealed record DocumentationPage(
                     .ToImmutableArray()
             ),
             xrefs
+                .AddRange(ctorRefs)
+                .AddRange(methodRefs)
+                .AddRange(propertyRefs)
         );
+    }
+
+    private static (ImmutableDictionary<Xref, Reference.Resolved>, IEnumerable<Markup>) Load<T>(
+        Type type,
+        Uri baseUrl,
+        XmlDocFile doc,
+        IDocumentationSectionLoader<T> loader)
+    {
+        var refs = ImmutableDictionary<Xref, Reference.Resolved>.Empty;
+        var docs = ImmutableArray.CreateBuilder<Markup>();
+
+        foreach (var item in loader.GetItems(type))
+        {
+            var xref = loader.GetXref(item);
+            var fragment = loader.Load(item, doc.GetDoc(xref));
+            refs.Add(xref, new Reference.Resolved(fragment.Name, new Uri(baseUrl + fragment.UrlFragment, UriKind.Relative)));
+            docs.AddRange(fragment.Markup);
+        }
+
+        return (refs, docs.PrependIfNotEmpty(loader.SectionHeader));
     }
 
     public static DocumentationPage Create(IGrouping<string, (Type, XElement)> g)
@@ -157,31 +148,5 @@ internal sealed record DocumentationPage(
             g.Key,
             new Markup.Seq(classes.Concat(interfaces).Concat(enums).Concat(structs).ToImmutableArray()),
             ImmutableDictionary<Xref, Reference.Resolved>.Empty);
-    }
-
-    private static IEnumerable<Markup> Method(MethodBase meth, XmlDocFile docFile)
-    {
-        var ret = (meth as MethodInfo)?.ReturnType.FriendlyName();
-        var declaration = string.IsNullOrEmpty(ret)
-            ? meth.FriendlyName()
-            : ret + " " + meth.FriendlyName();
-
-        return docFile.GetDoc(meth)
-            .Element("summary")
-            ?.Nodes()
-            .Select(Markup.FromXml)
-            .Append(new Markup.Seq(new Markup.SectionHeader("Declaration", 4, null), new Markup.CodeBlock(declaration)))
-            .Prepend(new Markup.SectionHeader(meth.FriendlyName(), 3, meth.UrlFriendlyName()))
-            ?? Enumerable.Empty<Markup>();
-    }
-
-    private static IEnumerable<Markup> Property(PropertyInfo prop, XmlDocFile docFile)
-    {
-        return docFile.GetDoc(prop)
-            .Element("summary")
-            ?.Nodes()
-            .Select(Markup.FromXml)
-            .Prepend(new Markup.SectionHeader(prop.FriendlyName(), 3, prop.UrlFriendlyName()))
-            ?? Enumerable.Empty<Markup>();
     }
 }
