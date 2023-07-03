@@ -13,6 +13,9 @@ internal static class UrlExtensions
     public static string UrlFriendlyName(this PropertyInfo prop)
         => MakeUrlFriendly(prop.Name);
 
+    public static string UrlFriendlyName(this FieldInfo field)
+        => MakeUrlFriendly(field.Name);
+
     public static string MakeUrlFriendly(string name)
         => name
             .Replace("``", "-", StringComparison.InvariantCulture)

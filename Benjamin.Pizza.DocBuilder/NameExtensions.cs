@@ -45,6 +45,9 @@ internal static partial class NameExtensions
     public static string FriendlyName(this PropertyInfo prop)
         => prop.Name;
 
+    public static string FriendlyName(this FieldInfo field)
+        => field.Name;
+
     [GeneratedRegex(@"(`|``)\d+")]
     private static partial Regex GenericTypeSuffix();
 }

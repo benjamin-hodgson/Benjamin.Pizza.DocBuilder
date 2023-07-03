@@ -61,12 +61,13 @@ internal record DocumentationPage(
             ?.Nodes()
             .Select(Markup.FromXml)
             .Prepend(new Markup.SectionHeader("Summary", 2, "summary"))
-            .Concat(typeDoc.Elements("example").Select(Markup.FromXml).Prepend(new Markup.SectionHeader("Examples", 2, "examples")))
+            .Concat(typeDoc.Elements("example").Select(Markup.FromXml).PrependIfNotEmpty(new Markup.SectionHeader("Examples", 2, "examples")))
             ?? Enumerable.Empty<Markup>();
 
         var (ctorRefs, ctorsSection) = Load(type, url, doc, new ConstructorDocumentationLoader());
         var (methodRefs, methodsSection) = Load(type, url, doc, new MethodDocumentationLoader());
         var (propertyRefs, propertiesSection) = Load(type, url, doc, new PropertyDocumentationLoader());
+        var (fieldRefs, fieldsSection) = Load(type, url, doc, new FieldDocumentationLoader());
 
         return new DocumentationPage(
             url,
@@ -76,6 +77,7 @@ internal record DocumentationPage(
                     .Concat(ctorsSection)
                     .Concat(methodsSection)
                     .Concat(propertiesSection)
+                    .Concat(fieldsSection)
                     .ToImmutableArray()
             ),
             ImmutableDictionary<Xref, Reference.Resolved>
@@ -84,6 +86,7 @@ internal record DocumentationPage(
                 .AddRange(ctorRefs)
                 .AddRange(methodRefs)
                 .AddRange(propertyRefs)
+                .AddRange(fieldRefs)
         );
     }
 

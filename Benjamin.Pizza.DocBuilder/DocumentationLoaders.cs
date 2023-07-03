@@ -142,3 +142,27 @@ internal sealed class PropertyDocumentationLoader : IDocumentationSectionLoader<
                 .Prepend(new Markup.SectionHeader(property.FriendlyName(), 3, property.UrlFriendlyName()))
         );
 }
+
+internal sealed class FieldDocumentationLoader : IDocumentationSectionLoader<Type, FieldInfo>
+{
+    public Markup.SectionHeader SectionHeader => new("Fields", 2, "fields");
+
+    public IEnumerable<FieldInfo> GetItems(Type type)
+        => type
+            .GetFields(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
+            .Where(m => !m.IsSpecialName);
+
+    public Xref GetXref(FieldInfo property) => Xref.Create(property);
+
+    public DocumentationFragment Load(FieldInfo field, XElement docElement)
+        => new(
+            field.FriendlyName(),
+            "#" + field.UrlFriendlyName(),
+            (docElement
+                .Element("summary")?
+                .Nodes()
+                .Select(Markup.FromXml)
+                ?? Enumerable.Empty<Markup>())
+                .Prepend(new Markup.SectionHeader(field.FriendlyName(), 3, field.UrlFriendlyName()))
+        );
+}
