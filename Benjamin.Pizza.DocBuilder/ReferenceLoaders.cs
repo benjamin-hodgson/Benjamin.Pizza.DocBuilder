@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
 
@@ -50,7 +51,7 @@ internal sealed class CachedReferenceLoader : IReferenceLoader
 {
     private readonly IReferenceLoader _underlying;
     private readonly ILogger<CachedReferenceLoader> _logger;
-    private readonly Dictionary<Xref, Reference.Resolved?> _cache = new();
+    private readonly ConcurrentDictionary<Xref, Reference.Resolved?> _cache = new();
 
     public CachedReferenceLoader(IReferenceLoader underlying, ILogger<CachedReferenceLoader> logger)
     {
