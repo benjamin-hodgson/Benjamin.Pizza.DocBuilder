@@ -86,10 +86,10 @@ internal record DocumentationPage(
                 new Markup.SectionHeader("See Also", 2, "seealso"),
                 new Markup.List(seeAlsoItems));
 
-        var (ctorRefs, ctorsSection) = Load(type, url, doc, new ConstructorDocumentationLoader());
-        var (methodRefs, methodsSection) = Load(type, url, doc, new MethodDocumentationLoader());
-        var (propertyRefs, propertiesSection) = Load(type, url, doc, new PropertyDocumentationLoader());
-        var (fieldRefs, fieldsSection) = Load(type, url, doc, new FieldDocumentationLoader());
+        var (ctorRefs, ctorsSection) = Load(type, url, doc, new ConstructorDocumentationSection());
+        var (methodRefs, methodsSection) = Load(type, url, doc, new MethodDocumentationSection());
+        var (propertyRefs, propertiesSection) = Load(type, url, doc, new PropertyDocumentationSection());
+        var (fieldRefs, fieldsSection) = Load(type, url, doc, new FieldDocumentationSection());
 
         return new DocumentationPage(
             url,
@@ -115,24 +115,24 @@ internal record DocumentationPage(
         );
     }
 
-    protected static (ImmutableDictionary<Xref, Reference.Resolved>, IEnumerable<Markup>) Load<TContext, T>(
-        TContext type,
+    protected static (ImmutableDictionary<Xref, Reference.Resolved>, IEnumerable<Markup>) Load<T>(
+        Type type,
         Uri baseUrl,
         XmlDocFile doc,
-        IDocumentationSectionLoader<TContext, T> loader)
+        ITypeDocumentationSection<T> section)
     {
         var refs = ImmutableDictionary.CreateBuilder<Xref, Reference.Resolved>();
         var docs = ImmutableArray.CreateBuilder<Markup>();
 
-        foreach (var item in loader.GetItems(type))
+        foreach (var item in section.GetItems(type))
         {
-            var xref = loader.GetXref(item);
-            var fragment = loader.Load(item, doc.GetDoc(xref));
+            var xref = section.GetXref(item);
+            var fragment = section.Load(item, doc.GetDoc(xref));
             refs.Add(xref, new Reference.Resolved(fragment.Name, new Uri(baseUrl + fragment.UrlFragment, UriKind.Relative)));
             docs.AddRange(fragment.Markup);
         }
 
-        return (refs.ToImmutable(), docs.PrependIfNotEmpty(loader.SectionHeader));
+        return (refs.ToImmutable(), docs.PrependIfNotEmpty(section.SectionHeader));
     }
 }
 
@@ -147,14 +147,11 @@ internal sealed record NamespaceDocumentationPage(
     {
         var url = new Uri(UrlExtensions.MakeUrlFriendly(g.Key) + ".html", UriKind.Relative);
 
-        // ignore the ContainedReferences as the namespace
-        // page is not the canonical source for the members
-        // of the namespace
-        var (_, classes) = Load(g, url, doc, new ClassDocumentationLoader());
-        var (_, interfaces) = Load(g, url, doc, new InterfaceDocumentationLoader());
-        var (_, delegates) = Load(g, url, doc, new DelegateDocumentationLoader());
-        var (_, enums) = Load(g, url, doc, new EnumDocumentationLoader());
-        var (_, structs) = Load(g, url, doc, new StructDocumentationLoader());
+        var classes = Load(g, doc, new ClassDocumentationSection());
+        var interfaces = Load(g, doc, new InterfaceDocumentationSection());
+        var delegates = Load(g, doc, new DelegateDocumentationSection());
+        var enums = Load(g, doc, new EnumDocumentationSection());
+        var structs = Load(g, doc, new StructDocumentationSection());
 
         return new DocumentationPage(
             url,
@@ -168,5 +165,15 @@ internal sealed record NamespaceDocumentationPage(
                     .ToImmutableArray()
             ),
             ImmutableDictionary<Xref, Reference.Resolved>.Empty);
+    }
+
+    private static IEnumerable<Markup> Load(IEnumerable<Type> namespaceMembers, XmlDocFile doc, INamespaceDocumentationSection section)
+    {
+        foreach (var type in namespaceMembers.Where(section.ShouldIncludeType))
+        {
+            var xref = Xref.Create(type);
+            var markup = section.GetMarkup(type, doc.GetDoc(xref));
+            yield return new Markup.Seq(markup.ToImmutableArray());
+        }
     }
 }

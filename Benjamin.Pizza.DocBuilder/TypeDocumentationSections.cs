@@ -3,10 +3,10 @@ using System.Xml.Linq;
 
 namespace Benjamin.Pizza.DocBuilder;
 
-internal interface IDocumentationSectionLoader<TContext, TItem>
+internal interface ITypeDocumentationSection<TItem>
 {
     Markup.SectionHeader SectionHeader { get; }
-    IEnumerable<TItem> GetItems(TContext ctx);
+    IEnumerable<TItem> GetItems(Type type);
     Xref GetXref(TItem item);
     DocumentationFragment Load(TItem item, XElement docElement);
 }
@@ -16,65 +16,7 @@ internal sealed record DocumentationFragment(
     string UrlFragment,
     IEnumerable<Markup> Markup);
 
-internal abstract class TypeDocumentationLoader : IDocumentationSectionLoader<IEnumerable<Type>, Type>
-{
-    public abstract Markup.SectionHeader SectionHeader { get; }
-
-    public abstract IEnumerable<Type> GetItems(IEnumerable<Type> ctx);
-
-    public Xref GetXref(Type type) => Xref.Create(type);
-
-    public DocumentationFragment Load(Type type, XElement docElement)
-        => new(
-            type.FriendlyName(),
-            type.UrlFriendlyName(),
-            (docElement.Element("summary")?.Nodes() ?? Enumerable.Empty<XNode>())
-                .Select(Markup.FromXml)
-                .Prepend(new Markup.SectionHeader(new Markup.Link(new Reference.Unresolved(Xref.Create(type))), 3, null))
-        );
-}
-
-internal sealed class ClassDocumentationLoader : TypeDocumentationLoader
-{
-    public override Markup.SectionHeader SectionHeader => new("Classes", 2, "classes");
-
-    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
-        => types.Where(t => t.IsClass && !t.IsDelegate());
-}
-
-internal sealed class InterfaceDocumentationLoader : TypeDocumentationLoader
-{
-    public override Markup.SectionHeader SectionHeader => new("Interfaces", 2, "interfaces");
-
-    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
-        => types.Where(t => t.IsInterface);
-}
-
-internal sealed class DelegateDocumentationLoader : TypeDocumentationLoader
-{
-    public override Markup.SectionHeader SectionHeader => new("Delegates", 2, "delegates");
-
-    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
-        => types.Where(t => t.IsDelegate());
-}
-
-internal sealed class EnumDocumentationLoader : TypeDocumentationLoader
-{
-    public override Markup.SectionHeader SectionHeader => new("Enums", 2, "enums");
-
-    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
-        => types.Where(t => t.IsEnum);
-}
-
-internal sealed class StructDocumentationLoader : TypeDocumentationLoader
-{
-    public override Markup.SectionHeader SectionHeader => new("Structs", 2, "structs");
-
-    public override IEnumerable<Type> GetItems(IEnumerable<Type> types)
-        => types.Where(t => t.IsValueType && !t.IsEnum);
-}
-
-internal abstract class MethodBaseDocumentationLoader<T> : IDocumentationSectionLoader<Type, T>
+internal abstract class MethodBaseDocumentationSection<T> : ITypeDocumentationSection<T>
     where T : MethodBase
 {
     public abstract Markup.SectionHeader SectionHeader { get; }
@@ -96,7 +38,7 @@ internal abstract class MethodBaseDocumentationLoader<T> : IDocumentationSection
         );
 }
 
-internal sealed class ConstructorDocumentationLoader : MethodBaseDocumentationLoader<ConstructorInfo>
+internal sealed class ConstructorDocumentationSection : MethodBaseDocumentationSection<ConstructorInfo>
 {
     public override Markup.SectionHeader SectionHeader => new("Constructors", 2, "constructors");
 
@@ -106,7 +48,7 @@ internal sealed class ConstructorDocumentationLoader : MethodBaseDocumentationLo
             : type.GetConstructors();
 }
 
-internal sealed class MethodDocumentationLoader : MethodBaseDocumentationLoader<MethodInfo>
+internal sealed class MethodDocumentationSection : MethodBaseDocumentationSection<MethodInfo>
 {
     public override Markup.SectionHeader SectionHeader => new("Methods", 2, "methods");
 
@@ -119,7 +61,7 @@ internal sealed class MethodDocumentationLoader : MethodBaseDocumentationLoader<
                 .ToArray();
 }
 
-internal sealed class PropertyDocumentationLoader : IDocumentationSectionLoader<Type, PropertyInfo>
+internal sealed class PropertyDocumentationSection : ITypeDocumentationSection<PropertyInfo>
 {
     public Markup.SectionHeader SectionHeader => new("Properties", 2, "properties");
 
@@ -143,7 +85,7 @@ internal sealed class PropertyDocumentationLoader : IDocumentationSectionLoader<
         );
 }
 
-internal sealed class FieldDocumentationLoader : IDocumentationSectionLoader<Type, FieldInfo>
+internal sealed class FieldDocumentationSection : ITypeDocumentationSection<FieldInfo>
 {
     public Markup.SectionHeader SectionHeader => new("Fields", 2, "fields");
 
