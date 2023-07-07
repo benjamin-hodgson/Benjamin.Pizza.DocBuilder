@@ -41,3 +41,9 @@ foreach (var page in documentation.Pages)
         HtmlRenderer.Render(page).ToString()
     ).ConfigureAwait(false);
 }
+
+// var defaultNamespaceUrl = new Uri(Path.ChangeExtension(Path.GetFileName(args[0]), "html"), UriKind.Relative);
+// await File.WriteAllTextAsync(
+//     Path.Combine("_site", "index.html"),
+//     RedirectPage.GetHtml(defaultNamespaceUrl).ToString()
+// ).ConfigureAwait(false);
