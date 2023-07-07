@@ -53,7 +53,6 @@ internal record DocumentationPage(
     public static DocumentationPage Create(Type type, XmlDocFile doc)
     {
         var url = new Uri(type.UrlFriendlyName() + ".html", UriKind.Relative);
-        var title = type.FriendlyName();
 
         var typeDoc = doc.GetDoc(type);
         var summarySection = typeDoc
@@ -62,6 +61,12 @@ internal record DocumentationPage(
             .Select(Markup.FromXml)
             .Prepend(new Markup.SectionHeader("Summary", 2, "summary"))
             ?? Enumerable.Empty<Markup>();
+
+        var declarationSection = new Markup[]
+        {
+            new Markup.SectionHeader("Declaration", 2, "declaration"),
+            Markup.CreateCodeBlock(type.GetDeclaration())
+        };
 
         var examplesSection = typeDoc
             .Elements("example")
@@ -93,9 +98,10 @@ internal record DocumentationPage(
 
         return new DocumentationPage(
             url,
-            title,
+            type.FriendlyName(),
             new Markup.Seq(
                 summarySection
+                    .Concat(declarationSection)
                     .Concat(remarksSection)
                     .Concat(examplesSection)
                     .Concat(ctorsSection)
@@ -107,7 +113,7 @@ internal record DocumentationPage(
             ),
             ImmutableDictionary<Xref, Reference.Resolved>
                 .Empty
-                .Add(Xref.Create(type), new Reference.Resolved(title, url))
+                .Add(Xref.Create(type), new Reference.Resolved(type.FriendlyName(), url))
                 .AddRange(ctorRefs)
                 .AddRange(methodRefs)
                 .AddRange(propertyRefs)

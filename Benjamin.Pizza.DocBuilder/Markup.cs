@@ -54,8 +54,24 @@ internal abstract partial record Markup : IRewritable<Markup>
         return new Seq(markup.ToImmutableArray());
     }
 
-    private static Markup CreateCodeBlock(string code)
-        => new CodeBlock(string.Join("\n", code.Trim().Split("\n").Select(line => line.Trim())));
+    public static Markup CreateCodeBlock(string code)
+    {
+        // trim the same amount of whitespace from each line (so as not to lose indentation)
+        var lines = code.Split("\n").SkipWhile(string.IsNullOrWhiteSpace).ToList();
+
+        var leadingWhitespace = lines[0].TakeWhile(char.IsWhiteSpace).Count();
+
+        var trimmedLines = lines
+            .Select(line => string.Concat(
+                line
+                    .Select((x, i) => (x, i))
+                    .SkipWhile(t => char.IsWhiteSpace(t.x) && t.i < leadingWhitespace)
+                    .Select(t => t.x)
+                )
+            );
+
+        return new CodeBlock(string.Join("\n", trimmedLines).Trim());
+    }
 
     public int CountChildren()
         => this switch

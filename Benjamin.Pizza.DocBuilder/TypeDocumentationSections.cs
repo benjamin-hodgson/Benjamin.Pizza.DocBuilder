@@ -25,17 +25,28 @@ internal abstract class MethodBaseDocumentationSection<T> : ITypeDocumentationSe
 
     public Xref GetXref(T meth) => Xref.Create(meth);
 
+    protected abstract string GetDeclaration(T meth);
+
     public DocumentationFragment Load(T meth, XElement docElement)
-        => new(
+    {
+        var summary = docElement
+            .Element("summary")?
+            .Nodes()
+            .Select(Markup.FromXml)
+            ?? Enumerable.Empty<Markup>();
+
+        var declaration = Markup.CreateCodeBlock(GetDeclaration(meth));
+
+        var content = summary
+            .Append(declaration)
+            .Prepend(new Markup.SectionHeader(meth.FriendlyName(), 3, meth.UrlFriendlyName()));
+
+        return new(
             meth.FriendlyName(),
             "#" + meth.UrlFriendlyName(),
-            (docElement
-                .Element("summary")?
-                .Nodes()
-                .Select(Markup.FromXml)
-                ?? Enumerable.Empty<Markup>())
-            .Prepend(new Markup.SectionHeader(meth.FriendlyName(), 3, meth.UrlFriendlyName()))
+            content
         );
+    }
 }
 
 internal sealed class ConstructorDocumentationSection : MethodBaseDocumentationSection<ConstructorInfo>
@@ -46,6 +57,8 @@ internal sealed class ConstructorDocumentationSection : MethodBaseDocumentationS
         => type.IsDelegate()
             ? Array.Empty<ConstructorInfo>()
             : type.GetConstructors();
+
+    protected override string GetDeclaration(ConstructorInfo meth) => meth.GetDeclaration();
 }
 
 internal sealed class MethodDocumentationSection : MethodBaseDocumentationSection<MethodInfo>
@@ -56,9 +69,14 @@ internal sealed class MethodDocumentationSection : MethodBaseDocumentationSectio
         => type.IsDelegate()
             ? Array.Empty<MethodInfo>()
             : type
-                .GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)
-                .Where(m => !m.IsSpecialName)
+                .GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic)
+                .Where(m =>
+                    !m.IsSpecialName
+                    && (m.IsPublic || m.IsFamily || m.IsFamilyOrAssembly)
+                    && !m.IsFamilyAndAssembly)
                 .ToArray();
+
+    protected override string GetDeclaration(MethodInfo meth) => meth.GetDeclaration();
 }
 
 internal sealed class PropertyDocumentationSection : ITypeDocumentationSection<PropertyInfo>
