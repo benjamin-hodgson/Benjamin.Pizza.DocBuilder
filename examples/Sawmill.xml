@@ -1,0 +1,2034 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Sawmill</name>
+    </assembly>
+    <members>
+        <member name="T:Sawmill.AutoRewriter`1">
+             <summary>
+             An experimental implementation of <see cref="T:Sawmill.IRewriter`1" /> using reflection.
+            
+             <see cref="T:Sawmill.AutoRewriter`1" /> looks for the subtype's constructor, and gets/sets
+             the <typeparamref name="T" />-children in the order that they appear in the constructor.
+             </summary>
+             <typeparam name="T">The rewritable type.</typeparam>
+        </member>
+        <member name="M:Sawmill.AutoRewriter`1.#ctor">
+            <summary>
+            Create a new instance of <see cref="T:Sawmill.AutoRewriter`1" />.
+            </summary>
+        </member>
+        <member name="M:Sawmill.AutoRewriter`1.CountChildren(`0)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />.
+            </summary>
+            <param name="value">The rewritable tree.</param>
+            <returns>The <paramref name="value" />'s number of immediate children.</returns>
+        </member>
+        <member name="M:Sawmill.AutoRewriter`1.GetChildren(System.Span{`0},`0)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />.
+            </summary>
+            <param name="childrenReceiver">
+            A <see cref="T:System.Span`1" /> to copy the current instance's immediate children into.
+            The <see cref="T:System.Span`1" />'s <see cref="P:System.Span`1.Length" /> should be equal to the number returned by <see cref="M:Sawmill.AutoRewriter`1.CountChildren(`0)" />.
+            </param>
+            <param name="value">The rewritable tree.</param>
+        </member>
+        <member name="M:Sawmill.AutoRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />.
+            </summary>
+            <param name="newChildren">The new children.</param>
+            <param name="value">The rewritable tree.</param>
+            <returns>A copy of <paramref name="value" /> with updated children.</returns>
+        </member>
+        <member name="P:Sawmill.AutoRewriter`1.Instance">
+            <summary>
+            Gets the single global instance of <see cref="T:Sawmill.AutoRewriter`1" />.
+            </summary>
+            <returns>The single global instance of <see cref="T:Sawmill.AutoRewriter`1" />.</returns>
+        </member>
+        <member name="M:Sawmill.AutoRewriter`1.ImplementsIEnumerableT(System.Type)">
+            <summary>
+            does type implement <see cref="T:System.Collections.Generic.IEnumerable`1" />[T] (not <see cref="T:System.Collections.Generic.IEnumerable`1" />[U] for some subtype U of T)?.
+            </summary>
+        </member>
+        <member name="T:Sawmill.Cursor`1">
+             <summary>
+             A <see cref="T:Sawmill.Cursor`1" /> is a mutable view of a location in a <typeparamref name="T" />-structure,
+             allowing efficient access to (and editing of) a node and its parent, siblings, and immediate children.
+            
+             <para>
+             You can think of a <see cref="T:Sawmill.Cursor`1" /> as being focused on a particular node.
+             After zooming in on a node, you can efficiently go up to the node's parent, down to the node's first child,
+             or left or right to the node's immediate siblings.
+             </para>
+            
+             <para>
+             <see cref="T:Sawmill.Cursor`1" /> is generally not as efficient or useful as the
+             <see cref="M:Sawmill.Rewriter.SelfAndDescendantsInContext``1(Sawmill.IRewriter{``0},``0)" /> family for replacing single nodes,
+             but it efficiently supports longer sequences of edits to a location and its neighbours.
+             </para>
+             </summary>
+            
+             <example>
+             Here we traverse to, and replace, the right child of a binary node.
+             <code>
+             Expr expr = new Add(new Lit(1), new Neg(new Lit(2)));
+             var cursor = expr.Cursor();
+             cursor.Down();
+             cursor.Right();
+            
+             Assert.Equal(new Neg(new Lit(2)), cursor.Focus);
+            
+             cursor.Focus = new Lit(10);
+             cursor.Top();
+            
+             Assert.Equal(new Add(new Lit(1), new Lit(10)), cursor.Focus);
+             </code>
+             </example>
+             <typeparam name="T">The rewritable tree type.</typeparam>
+        </member>
+        <member name="P:Sawmill.Cursor`1.Focus">
+            <summary>
+            Gets or sets the current focus of the <see cref="T:Sawmill.Cursor`1" />.
+            </summary>
+            <returns>The current focus of the <see cref="T:Sawmill.Cursor`1" />.</returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Move(Sawmill.Direction)">
+            <summary>
+            Move in a given <see cref="T:Sawmill.Direction" />.
+            </summary>
+            <param name="direction">The <see cref="T:Sawmill.Direction" /> to move in.</param>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when the direction leads off the edge of the tree. The <see cref="T:Sawmill.Cursor`1" /> is left in the last known good state.
+            </exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            Thrown when <paramref name="direction" /> is not a valid <see cref="T:Sawmill.Direction" />.
+            </exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryMove(Sawmill.Direction)">
+            <summary>
+            Try to move in a given <see cref="T:Sawmill.Direction" />.
+            </summary>
+            <param name="direction">The <see cref="T:Sawmill.Direction" /> to move in.</param>
+            <returns>
+            True if the operation was successful, false if the direction leads off the edge of the tree.
+            </returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">
+            Thrown when <paramref name="direction" /> is not a valid <see cref="T:Sawmill.Direction" />.
+            </exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Up">
+             <summary>
+             Focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s parent.
+            
+             <para>
+             Going <see cref="M:Sawmill.Cursor`1.Up" /> "plugs the hole" in the parent, replacing the parent's children as necessary.
+             This releases old versions of the current <see cref="P:Sawmill.Cursor`1.Focus" /> and its children so that they can be garbage collected.
+             </para>
+             </summary>
+             <exception cref="T:System.InvalidOperationException">The <see cref="T:Sawmill.Cursor`1" /> is already focused on the root node.</exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Up(System.Int32)">
+             <summary>
+             Go <see cref="M:Sawmill.Cursor`1.Up" /> <paramref name="count" /> times.
+            
+             <para>
+             Going <see cref="M:Sawmill.Cursor`1.Up(System.Int32)" /> "plugs the hole" in the ancestors, replacing their children as necessary.
+             This releases old versions of the ancestors and their children, so that they can be garbage collected.
+             </para>
+             </summary>
+             <param name="count">The distance.</param>
+             <exception cref="T:System.InvalidOperationException">
+             The <see cref="T:Sawmill.Cursor`1" /> reached the root node.
+             The <see cref="T:Sawmill.Cursor`1" /> is left in the last good state, that is, at the top of the tree.
+             </exception>
+             <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="count" /> was negative.</exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryUp">
+             <summary>
+             Try to focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s parent.
+            
+             <para>
+             This operation "plugs the hole" in the parent, replacing the parent's children as necessary.
+             This releases old versions of the current <see cref="P:Sawmill.Cursor`1.Focus" /> and its children, so that they can be garbage collected.
+             </para>
+             </summary>
+             <returns>
+             True if the operation was successful, false if the <see cref="T:Sawmill.Cursor`1" /> is already focused on the root node.
+             </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryUp(System.Int32)">
+             <summary>
+             Go <see cref="M:Sawmill.Cursor`1.Up" /> <paramref name="count" /> times, stopping if you reach the top.
+            
+             <para>
+             This operation "plugs the hole" in the parent, replacing the parent's children as necessary.
+             This releases old versions of the ancestors and their children, so that they can be garbage collected.
+             </para>
+             </summary>
+             <param name="count">The distance.</param>
+             <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="count" /> was negative.</exception>
+             <returns>
+             True if the operation was successful, false if the cursor went <see cref="M:Sawmill.Cursor`1.Up" /> fewer than <paramref name="count" /> times.
+             </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Top">
+             <summary>
+             Move the <see cref="T:Sawmill.Cursor`1" /> to the top of the tree.
+            
+             <para>
+             This operation "plugs the hole" in all of the current node's ancestors, replacing their children as necessary.
+             Going to the <see cref="M:Sawmill.Cursor`1.Top" /> releases old versions of the tree so that they can be garbage collected.
+             </para>
+             </summary>
+        </member>
+        <member name="M:Sawmill.Cursor`1.UpWhile(System.Func{`0,System.Boolean})">
+             <summary>
+             Go <see cref="M:Sawmill.Cursor`1.Up" /> as long as <paramref name="predicate" /> returns true for the current <see cref="P:Sawmill.Cursor`1.Focus" />.
+             In other words, find the first ancestor of <see cref="P:Sawmill.Cursor`1.Focus" /> (including itself) which does not satisfy <paramref name="predicate" />.
+            
+             <para>
+             This operation "plugs the hole" in the ancestors, replacing their children as necessary.
+             This releases old versions of the ancestors and their children, so that they can be garbage collected.
+             </para>
+             </summary>
+            
+             <param name="predicate">The predicate to invoke on the current focus and its ancestors.</param>
+             <exception name="ArgumentNullException"><paramref name="predicate" /> was null.</exception>
+             <exception cref="T:System.InvalidOperationException">
+             The <see cref="T:Sawmill.Cursor`1" /> reached the root node.
+             The <see cref="T:Sawmill.Cursor`1" /> is left in the last good state, that is, at the top of the tree.
+             </exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryUpWhile(System.Func{`0,System.Boolean})">
+             <summary>
+             Go <see cref="M:Sawmill.Cursor`1.Up" /> as long as <paramref name="predicate" /> returns true for the current <see cref="P:Sawmill.Cursor`1.Focus" />, stopping if you reach the top.
+             In other words, find the first ancestor of <see cref="P:Sawmill.Cursor`1.Focus" /> (including itself) which does not satisfy <paramref name="predicate" />.
+            
+             <para>
+             This operation "plugs the hole" in the ancestors, replacing their children as necessary.
+             This releases old versions of the ancestors and their children, so that they can be garbage collected.
+             </para>
+             </summary>
+            
+             <param name="predicate">The predicate to invoke on the current focus and its ancestors.</param>
+             <exception name="ArgumentNullException"><paramref name="predicate" /> was null.</exception>
+             <returns>
+             True if an ancestor not satisfying <paramref name="predicate" /> was found, false if the <see cref="T:Sawmill.Cursor`1" /> reached the top.
+             </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Down">
+             <summary>
+             Focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s first child.
+            
+             <para>
+             This operation "opens a hole" in the current node, descending to the children so you can replace them one at a time.
+             </para>
+             </summary>
+             <exception cref="T:System.InvalidOperationException">The current <see cref="P:Sawmill.Cursor`1.Focus" />'s has no children.</exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Down(System.Int32)">
+             <summary>
+             Go <see cref="M:Sawmill.Cursor`1.Down" /> <paramref name="count" /> times.
+            
+             <para>
+             This operation "opens a hole" in the current node and its <paramref name="count" /> first descendants.
+             </para>
+             </summary>
+             <param name="count">The distance.</param>
+             <exception cref="T:System.InvalidOperationException">
+             The <see cref="T:Sawmill.Cursor`1" /> reached a node with no children.
+             The <see cref="T:Sawmill.Cursor`1" /> is left in the last good state, that is, at the bottom of the tree.
+             </exception>
+             <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="count" /> was negative.</exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryDown">
+             <summary>
+             Try to focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s first child.
+            
+             <para>
+             This operation "opens a hole" in the current node, descending to the children so you can replace them one at a time.
+             </para>
+             </summary>
+             <returns>True if the operation was successful, false if the current <see cref="P:Sawmill.Cursor`1.Focus" /> has no children.</returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryDown(System.Int32)">
+             <summary>
+             Go <see cref="M:Sawmill.Cursor`1.Down" /> <paramref name="count" /> times, stopping if you reach a node with no children.
+            
+             <para>
+             This operation "opens a hole" in the current node and its <paramref name="count" /> first descendants.
+             </para>
+             </summary>
+             <param name="count">The distance.</param>
+             <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="count" /> was negative.</exception>
+             <returns>
+             True if the operation was successful, false if the cursor went <see cref="M:Sawmill.Cursor`1.Down" /> fewer than <paramref name="count" /> times.
+             </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Bottom">
+            <summary>
+            Move the current <see cref="P:Sawmill.Cursor`1.Focus" /> to the bottom-left of the tree.
+            Do nothing if the current <see cref="P:Sawmill.Cursor`1.Focus" /> has no children.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Cursor`1.DownWhile(System.Func{`0,System.Boolean})">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Down" /> as long as <paramref name="predicate" /> returns true for the current <see cref="P:Sawmill.Cursor`1.Focus" />.
+            In other words, find the first leftmost descendant of <see cref="P:Sawmill.Cursor`1.Focus" /> (including itself) which does not satisfy <paramref name="predicate" />.
+            </summary>
+            <param name="predicate">The predicate to invoke on the current focus and its leftmost descendants.</param>
+            <exception name="ArgumentNullException"><paramref name="predicate" /> was null.</exception>
+            <exception cref="T:System.InvalidOperationException">
+            The <see cref="T:Sawmill.Cursor`1" /> reached the root node.
+            The <see cref="T:Sawmill.Cursor`1" /> is left in the last good state, that is, at the bottom of the tree.
+            </exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryDownWhile(System.Func{`0,System.Boolean})">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Down" /> as long as <paramref name="predicate" /> returns true for the current <see cref="P:Sawmill.Cursor`1.Focus" />, stopping if you reach the bottom.
+            In other words, find the first leftmost descendant of <see cref="P:Sawmill.Cursor`1.Focus" /> (including itself) which does not satisfy <paramref name="predicate" />.
+            </summary>
+            <param name="predicate">The predicate to invoke on the current focus and its leftmost descendants.</param>
+            <exception name="ArgumentNullException"><paramref name="predicate" /> was null.</exception>
+            <returns>
+            True if a leftmost descendant not satisfying <paramref name="predicate" /> was found, false if the <see cref="T:Sawmill.Cursor`1" /> reached the bottom.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Left">
+            <summary>
+            Focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s immediate predecessor sibling.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">The <see cref="T:Sawmill.Cursor`1" /> is already focused on the leftmost sibling.</exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Left(System.Int32)">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Left" /> <paramref name="count" /> times.
+            </summary>
+            <param name="count">The distance.</param>
+            <exception cref="T:System.InvalidOperationException">
+            The <see cref="T:Sawmill.Cursor`1" /> reached the leftmost sibling.
+            The <see cref="T:Sawmill.Cursor`1" /> is left in the last good state, that is, focused on the leftmost sibling.
+            </exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="count" /> was negative.</exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryLeft">
+            <summary>
+            Try to focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s immediate predecessor sibling.
+            </summary>
+            <returns>
+            True if the operation was successful, false if the <see cref="T:Sawmill.Cursor`1" /> is already focused on the leftmost sibling.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryLeft(System.Int32)">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Left" /> <paramref name="count" /> times, stopping if you reach the leftmost sibling.
+            </summary>
+            <param name="count">The distance.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="count" /> was negative.</exception>
+            <returns>
+            True if the operation was successful, false if the cursor went <see cref="M:Sawmill.Cursor`1.Left" /> fewer than <paramref name="count" /> times.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Leftmost">
+            <summary>
+            Focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s leftmost sibling.
+            Do nothing if the <see cref="T:Sawmill.Cursor`1" /> is already focused on the leftmost sibling.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Cursor`1.LeftWhile(System.Func{`0,System.Boolean})">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Left" /> as long as <paramref name="predicate" /> returns true for the current <see cref="P:Sawmill.Cursor`1.Focus" />.
+            In other words, find the first left sibling of <see cref="P:Sawmill.Cursor`1.Focus" /> (including itself) which does not satisfy <paramref name="predicate" />.
+            </summary>
+            <param name="predicate">The predicate to invoke on the current focus and its ancestors.</param>
+            <exception name="ArgumentNullException"><paramref name="predicate" /> was null.</exception>
+            <exception cref="T:System.InvalidOperationException">
+            The <see cref="T:Sawmill.Cursor`1" /> reached the root node.
+            The <see cref="T:Sawmill.Cursor`1" /> is left in the last good state, that is, at the leftmost sibling.
+            </exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryLeftWhile(System.Func{`0,System.Boolean})">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Left" /> as long as <paramref name="predicate" /> returns true for the current <see cref="P:Sawmill.Cursor`1.Focus" />, stopping if you reach the leftmost sibling.
+            In other words, find the left sibling of <see cref="P:Sawmill.Cursor`1.Focus" /> (including itself) which does not satisfy <paramref name="predicate" />.
+            </summary>
+            <param name="predicate">The predicate to invoke on the current focus and its ancestors.</param>
+            <exception name="ArgumentNullException"><paramref name="predicate" /> was null.</exception>
+            <returns>
+            True if an ancestor not satisfying <paramref name="predicate" /> was found, false if the <see cref="T:Sawmill.Cursor`1" /> reached the leftmost sibling.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Right">
+            <summary>
+            Focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s immediate successor sibling.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">The <see cref="T:Sawmill.Cursor`1" /> is already focused on the rightmost sibling.</exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Right(System.Int32)">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Right" /> <paramref name="count" /> times.
+            </summary>
+            <param name="count">The distance.</param>
+            <exception cref="T:System.InvalidOperationException">
+            The <see cref="T:Sawmill.Cursor`1" /> reached the rightmost sibling.
+            The <see cref="T:Sawmill.Cursor`1" /> is left in the last good state, that is, focused on the rightmost sibling.
+            </exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="count" /> was negative.</exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryRight">
+            <summary>
+            Try to focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s immediate successor sibling.
+            </summary>
+            <returns>True if the operation was successful, false if the <see cref="T:Sawmill.Cursor`1" /> is already focused on the rightmost sibling.</returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryRight(System.Int32)">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Right" /> <paramref name="count" /> times, stopping if you reach the rightmost sibling.
+            </summary>
+            <param name="count">The distance.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="count" /> was negative.</exception>
+            <returns>
+            True if the operation was successful, false if the cursor went <see cref="M:Sawmill.Cursor`1.Right" /> fewer than <paramref name="count" /> times.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Rightmost">
+            <summary>
+            Focus the <see cref="T:Sawmill.Cursor`1" /> on the current <see cref="P:Sawmill.Cursor`1.Focus" />'s rightmost sibling.
+            Do nothing if the <see cref="T:Sawmill.Cursor`1" /> is already focused on the rightmost sibling.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Cursor`1.RightWhile(System.Func{`0,System.Boolean})">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Right" /> as long as <paramref name="predicate" /> returns true for the current <see cref="P:Sawmill.Cursor`1.Focus" />.
+            In other words, find the first Right sibling of <see cref="P:Sawmill.Cursor`1.Focus" /> (including itself) which does not satisfy <paramref name="predicate" />.
+            </summary>
+            <param name="predicate">The predicate to invoke on the current focus and its ancestors.</param>
+            <exception name="ArgumentNullException"><paramref name="predicate" /> was null.</exception>
+            <exception cref="T:System.InvalidOperationException">
+            The <see cref="T:Sawmill.Cursor`1" /> reached the root node.
+            The <see cref="T:Sawmill.Cursor`1" /> is Right in the last good state, that is, at the Rightmost sibling.
+            </exception>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryRightWhile(System.Func{`0,System.Boolean})">
+            <summary>
+            Go <see cref="M:Sawmill.Cursor`1.Right" /> as long as <paramref name="predicate" /> returns true for the current <see cref="P:Sawmill.Cursor`1.Focus" />, stopping if you reach the Rightmost sibling.
+            In other words, find the Right sibling of <see cref="P:Sawmill.Cursor`1.Focus" /> (including itself) which does not satisfy <paramref name="predicate" />.
+            </summary>
+            <param name="predicate">The predicate to invoke on the current focus and its ancestors.</param>
+            <exception name="ArgumentNullException"><paramref name="predicate" /> was null.</exception>
+            <returns>
+            True if an ancestor not satisfying <paramref name="predicate" /> was found, false if the <see cref="T:Sawmill.Cursor`1" /> reached the Rightmost sibling.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.GetPath">
+            <summary>
+            Yields a sequence of <see cref="T:Sawmill.Direction" />s describing how to get from the <see cref="M:Sawmill.Cursor`1.Top" />
+            of the tree to the current <see cref="P:Sawmill.Cursor`1.Focus" />.
+            The resulting path can be <see cref="M:Sawmill.Cursor`1.Follow(System.Collections.Generic.IEnumerable{Sawmill.Direction})" />ed by a <see cref="T:Sawmill.Cursor`1" />.
+            This is useful if, for example, you need to compare the nodes at a given position in two different trees.
+            </summary>
+            <returns>A sequence of <see cref="T:Sawmill.Direction" />s.</returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.Follow(System.Collections.Generic.IEnumerable{Sawmill.Direction})">
+            <summary>
+            Follow a path.
+            </summary>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown when path leads off the edge of the tree. The <see cref="T:Sawmill.Cursor`1" /> is left in the last known good state.
+            </exception>
+            <param name="path">The path to follow.</param>
+        </member>
+        <member name="M:Sawmill.Cursor`1.TryFollow(System.Collections.Generic.IEnumerable{Sawmill.Direction})">
+            <summary>
+            Follow a path.
+            </summary>
+            <param name="path">The path to follow.</param>
+            <returns>
+            True if the path was successfully followed in full, false if the path led off the edge of the tree.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.ReleaseOldVersions">
+             <summary>
+             Release old versions of the tree for garbage collection.
+             The <see cref="T:Sawmill.Cursor`1" /> is left focused on the current node.
+            
+             <para>
+             Typically you won't need to call this method yourself -
+             just call <see cref="M:Sawmill.Cursor`1.Top" /> at the end of your sequence of edits to get the new tree back.
+             (This method is equivalent to calling <see cref="M:Sawmill.Cursor`1.Top" /> and then returning to where you were.)
+             </para>
+            
+             <para>
+             The worst-case scenario for <see cref="T:Sawmill.Cursor`1" />'s memory usage is code which traverses a large tree and
+             alternates <see cref="M:Sawmill.Cursor`1.Down" /> calls with setting the <see cref="P:Sawmill.Cursor`1.Focus" />,
+             without any calls to <see cref="M:Sawmill.Cursor`1.Up" /> in between.
+             If this is a typical usage pattern for your application, and you find that <see cref="T:Sawmill.Cursor`1" />
+             is causing high memory usage because it's holding on to old trees, some infrequent calls to
+             this method (say, every 1000 edits) should improve the memory usage (at the cost of some speed).
+             </para>
+             </summary>
+        </member>
+        <member name="M:Sawmill.Cursor`1.SearchDownAndRight(System.Func{`0,System.Boolean})">
+             <summary>
+             Focus the current focus's first descendant or right sibling's descendant which satisfies <paramref name="predicate" />,
+             searching descendants before siblings and ending at the current node's rightmost sibling.
+             </summary>
+            
+             <remarks>
+             This function searches the bottom-left part of the tree first, so will typically end up focusing a node lower down than <see cref="M:Sawmill.Cursor`1.SearchRightAndDown(System.Func{`0,System.Boolean})" />.
+             </remarks>
+            
+             <seealso cref="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)" />
+             <param name="predicate">A predicate which returns true when the search should stop.</param>
+             <returns>True if a matching focus was found, false if the search was exhaustive.</returns>
+        </member>
+        <member name="M:Sawmill.Cursor`1.SearchRightAndDown(System.Func{`0,System.Boolean})">
+             <summary>
+             Focus the current focus's first descendant or right sibling's descendant which satisfies <paramref name="predicate" />,
+             searching siblings before descendants and ending at the current node's lowest leftmost descendant.
+            
+             <para>
+             This function searches the top-right part of the tree first, so will typically end up focusing a node higher up than <see cref="M:Sawmill.Cursor`1.SearchDownAndRight(System.Func{`0,System.Boolean})" />.
+             </para>
+             </summary>
+             <param name="predicate">A predicate which returns true when the search should stop.</param>
+             <returns>True if a matching focus was found, false if the search was exhaustive.</returns>
+        </member>
+        <member name="T:Sawmill.Direction">
+            <summary>
+            Represents a direction that a <see cref="T:Sawmill.Cursor`1" /> can move in.
+            </summary>
+        </member>
+        <member name="F:Sawmill.Direction.Up">
+            <summary>
+            Move to the parent.
+            </summary>
+        </member>
+        <member name="F:Sawmill.Direction.Down">
+            <summary>
+            Move to the first child.
+            </summary>
+        </member>
+        <member name="F:Sawmill.Direction.Left">
+            <summary>
+            Move to the previous sibling.
+            </summary>
+        </member>
+        <member name="F:Sawmill.Direction.Right">
+            <summary>
+            Move to the next sibling.
+            </summary>
+        </member>
+        <member name="T:Sawmill.Expressions.ExpressionExtensions">
+            <summary>
+            Extension methods for <see cref="T:System.Linq.Expressions.Expression" />s.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.CountChildren(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.GetChildren(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.GetChildren``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.GetChildren(System.Linq.Expressions.Expression,System.Span{System.Linq.Expressions.Expression})">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.SetChildren(System.Linq.Expressions.Expression,System.ReadOnlySpan{System.Linq.Expressions.Expression})">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.DescendantsAndSelf(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantsAndSelf``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.SelfAndDescendants(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.SelfAndDescendantsBreadthFirst(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsBreadthFirst``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.ChildrenInContext(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.ChildrenInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.SelfAndDescendantsInContext(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.DescendantsAndSelfInContext(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantsAndSelfInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.SelfAndDescendantsInContextBreadthFirst(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsInContextBreadthFirst``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.DescendantAt(System.Linq.Expressions.Expression,System.Collections.Generic.IEnumerable{Sawmill.Direction})">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.ReplaceDescendantAt``1(System.Linq.Expressions.Expression,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.ReplaceDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0,``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.RewriteDescendantAt``1(System.Linq.Expressions.Expression,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{System.Linq.Expressions.Expression,System.Linq.Expressions.Expression})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.RewriteDescendantAt``1(System.Linq.Expressions.Expression,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{System.Linq.Expressions.Expression,System.Threading.Tasks.ValueTask{System.Linq.Expressions.Expression}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.Cursor(System.Linq.Expressions.Expression)">
+            <inheritdoc cref="M:Sawmill.Rewriter.Cursor``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.Fold``1(System.Linq.Expressions.Expression,Sawmill.SpanFunc{``0,System.Linq.Expressions.Expression,``0})">
+            <inheritdoc cref="M:Sawmill.Rewritable.Fold``2(``0,Sawmill.SpanFunc{``1,``0,``1})" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.Fold``1(System.Linq.Expressions.Expression,System.Func{System.Memory{``0},System.Linq.Expressions.Expression,System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewritable.Fold``2(``0,System.Func{System.Memory{``1},``0,System.Threading.Tasks.ValueTask{``1}})" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.ZipFold``1(System.Linq.Expressions.Expression[],System.Func{System.Linq.Expressions.Expression[],System.Collections.Generic.IEnumerable{``0},``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.ZipFold``1(System.Linq.Expressions.Expression[],System.Func{System.Linq.Expressions.Expression[],System.Collections.Generic.IAsyncEnumerable{``0},System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.ZipFold``1(System.Linq.Expressions.Expression,System.Linq.Expressions.Expression,System.Func{System.Linq.Expressions.Expression,System.Linq.Expressions.Expression,System.Collections.Generic.IEnumerable{``0},``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.ZipFold``1(System.Linq.Expressions.Expression,System.Linq.Expressions.Expression,System.Func{System.Linq.Expressions.Expression,System.Linq.Expressions.Expression,System.Collections.Generic.IAsyncEnumerable{``0},System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.Rewrite(System.Linq.Expressions.Expression,System.Func{System.Linq.Expressions.Expression,System.Linq.Expressions.Expression})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.Rewrite(System.Linq.Expressions.Expression,System.Func{System.Linq.Expressions.Expression,System.Threading.Tasks.ValueTask{System.Linq.Expressions.Expression}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.RewriteChildren(System.Linq.Expressions.Expression,System.Func{System.Linq.Expressions.Expression,System.Linq.Expressions.Expression})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.RewriteChildren(System.Linq.Expressions.Expression,System.Func{System.Linq.Expressions.Expression,System.Threading.Tasks.ValueTask{System.Linq.Expressions.Expression}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.RewriteIter(System.Linq.Expressions.Expression,System.Func{System.Linq.Expressions.Expression,System.Linq.Expressions.Expression})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionExtensions.RewriteIter(System.Linq.Expressions.Expression,System.Func{System.Linq.Expressions.Expression,System.Threading.Tasks.ValueTask{System.Linq.Expressions.Expression}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="T:Sawmill.Expressions.ExpressionRewriter">
+            <summary>
+            An implementation of <see cref="T:Sawmill.IRewriter`1" /> for <see cref="T:System.Linq.Expressions.Expression" />s.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionRewriter.#ctor">
+            <summary>
+            Create a new instance of <see cref="T:Sawmill.Expressions.ExpressionRewriter" />.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionRewriter.CountChildren(System.Linq.Expressions.Expression)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />.
+            </summary>
+            <param name="value">The value.</param>
+            <returns><paramref name="value" />'s number of immediate children.</returns>
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionRewriter.GetChildren(System.Span{System.Linq.Expressions.Expression},System.Linq.Expressions.Expression)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />.
+            </summary>
+            <param name="childrenReceiver">
+            A <see cref="T:System.Span`1" /> to copy <paramref name="value" />'s immediate children into.
+            The <see cref="T:System.Span`1" />'s <see cref="P:System.Span`1.Length" /> will be equal to the number returned by <see cref="M:Sawmill.Expressions.ExpressionRewriter.CountChildren(System.Linq.Expressions.Expression)" />.
+            </param>
+            <param name="value">The value.</param>
+        </member>
+        <member name="M:Sawmill.Expressions.ExpressionRewriter.SetChildren(System.ReadOnlySpan{System.Linq.Expressions.Expression},System.Linq.Expressions.Expression)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />.
+            </summary>
+            <param name="newChildren">The new children.</param>
+            <param name="value">The old value, whose immediate children should be replaced.</param>
+            <returns>A copy of <paramref name="value" /> with updated children.</returns>
+        </member>
+        <member name="P:Sawmill.Expressions.ExpressionRewriter.Instance">
+            <summary>
+            Gets the single global instance of <see cref="T:Sawmill.Expressions.ExpressionRewriter" />.
+            </summary>
+            <returns>The single global instance of <see cref="T:Sawmill.Expressions.ExpressionRewriter" />.</returns>
+        </member>
+        <member name="T:Sawmill.IRewritable`1">
+             <summary>
+             A object is rewriterable if it knows how to access its immediate children.
+             </summary>
+            
+             <remarks>
+             Implementations should ensure that you always get the children you just set
+             (<c>rewritable.SetChildren(children).GetChildren() == children</c>),
+             and that successive sets overwrite the earlier operation
+             (<c>rewritable.SetChildren(children1).SetChildren(children2) == rewritable.SetChildren(children2)</c>).
+             </remarks>
+            
+             <seealso cref="T:Sawmill.IRewriter`1" />
+             <typeparam name="T">The type of the object implementing the interface.</typeparam>
+        </member>
+        <member name="M:Sawmill.IRewritable`1.CountChildren">
+             <summary>
+             Count the immediate children of the value.
+             </summary>
+            
+             <example>
+             Given a representation of the expression <c>(1+2)+3</c>.
+             <code>
+             Expr expr = new Add(
+                 new Add(
+                     new Lit(1),
+                     new Lit(2)
+                 ),
+                 new Lit(3)
+             );
+             </code>
+             <see cref="M:Sawmill.IRewritable`1.CountChildren" /> counts the immediate children of the topmost (Add) node.
+             <code>
+             Assert.Equal(2, expr.CountChildren());
+             </code>
+             </example>
+            
+             <seealso cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />
+             <returns>The current instance's number of immediate children.</returns>
+        </member>
+        <member name="M:Sawmill.IRewritable`1.GetChildren(System.Span{`0})">
+             <summary>
+             Copy the immediate children of the value into <paramref name="childrenReceiver" />.
+             </summary>
+             <example>
+             Given a representation of the expression <c>(1+2)+3</c>.
+             <code>
+             Expr expr = new Add(
+                 new Add(
+                     new Lit(1),
+                     new Lit(2)
+                 ),
+                 new Lit(3)
+             );
+             </code>
+             <see cref="M:Sawmill.IRewritable`1.GetChildren(System.Span{`0})" /> copies the immediate children of the topmost node into the span.
+             <code>
+             Expr[] expected = new[]
+                 {
+                     new Add(
+                         new Lit(1),
+                         new Lit(2)
+                     ),
+                     new Lit(3)
+                 };
+             var array = new Expr[expr.CountChildren()];
+             expr.GetChildren(array);
+             Assert.Equal(expected, array);
+             </code>
+             </example>
+            
+             <seealso cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />
+             <param name="childrenReceiver">
+             A <see cref="T:System.Span`1" /> to copy the current instance's immediate children into.
+             The <see cref="T:System.Span`1" />'s <see cref="P:System.Span`1.Length" /> should be equal to the number returned by <see cref="M:Sawmill.IRewritable`1.CountChildren" />.
+             </param>
+        </member>
+        <member name="M:Sawmill.IRewritable`1.SetChildren(System.ReadOnlySpan{`0})">
+             <summary>
+             Set the immediate children of the currentInstance.
+             </summary>
+            
+             <remarks>
+             Callers should ensure that <paramref name="newChildren" /> contains the same number of children as was returned by
+             <see cref="M:Sawmill.IRewritable`1.GetChildren(System.Span{`0})" />.
+             </remarks>
+            
+             <example>
+             Given a representation of the expression <c>(1+2)+3</c>.
+             <code>
+             Expr expr = new Add(
+                 new Add(
+                     new Lit(1),
+                     new Lit(2)
+                 ),
+                 new Lit(3)
+             );
+             </code>
+             <see cref="M:Sawmill.IRewritable`1.SetChildren(System.ReadOnlySpan{`0})" /> replaces the immediate children of the topmost node.
+             <code>
+             Expr expected = new Add(
+                 new Lit(4),
+                 new Lit(5)
+             );
+             Assert.Equal(expected, expr.SetChildren(Children.Two(new Lit(4), new Lit(5))));
+             </code>
+             </example>
+            
+             <seealso cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />.
+             <param name="newChildren">The new children.</param>
+             <returns>A copy of the current instance with updated children.</returns>
+        </member>
+        <member name="T:Sawmill.IRewriter`1">
+             <summary>
+             A rewriter is an object which knows how to access the immediate children of a value of type <typeparamref name="T" />.
+             </summary>
+            
+             <remarks>
+             Implementations should ensure that you always get the children you just set
+             (<c>rewriter.GetChildren(rewriter.SetChildren(children, expr)) == children</c>),
+             and that successive sets overwrite the earlier operation
+             (<c>rewriter.SetChildren(children2, rewriter.SetChildren(children1, expr)) == rewriter.SetChildren(children2, expr)</c>).
+             </remarks>
+            
+             <seealso cref="T:Sawmill.IRewritable`1" />
+             <typeparam name="T">The type for which the rewriter can get the immediate children.</typeparam>
+        </member>
+        <member name="M:Sawmill.IRewriter`1.CountChildren(`0)">
+             <summary>
+             Count the immediate children of the value.
+             </summary>
+             <example>
+             Given a representation of the expression <c>(1+2)+3</c>.
+             <code>
+             Expr expr = new Add(
+                 new Add(
+                     new Lit(1),
+                     new Lit(2)
+                 ),
+                 new Lit(3)
+             );
+             </code>
+             <see cref="M:Sawmill.IRewriter`1.CountChildren(`0)" /> counts the immediate children of the topmost (Add) node.
+             <code>
+             Assert.Equal(2, rewriter.CountChildren(expr));
+             </code>
+             </example>
+            
+             <seealso cref="M:Sawmill.IRewritable`1.CountChildren" />
+             <param name="value">The value.</param>
+             <returns><paramref name="value" />'s number of immediate children.</returns>
+        </member>
+        <member name="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)">
+             <summary>
+             Copy the immediate children of the value into <paramref name="childrenReceiver" />.
+             </summary>
+             <example>
+             Given a representation of the expression <c>(1+2)+3</c>.
+             <code>
+             Expr expr = new Add(
+                 new Add(
+                     new Lit(1),
+                     new Lit(2)
+                 ),
+                 new Lit(3)
+             );
+             </code>
+             <see cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" /> copies the immediate children of the topmost node into the span.
+             <code>
+             Expr[] expected = new[]
+                 {
+                     new Add(
+                         new Lit(1),
+                         new Lit(2)
+                     ),
+                     new Lit(3)
+                 };
+             var array = new Expr[rewriter.CountChildren(expr)];
+             rewriter.GetChildren(array, expr);
+             Assert.Equal(expected, array);
+             </code>
+             </example>
+            
+             <seealso cref="M:Sawmill.IRewritable`1.GetChildren(System.Span{`0})" />
+             <param name="childrenReceiver">
+             A <see cref="T:System.Span`1" /> to copy <paramref name="value" />'s immediate children into.
+             The <see cref="T:System.Span`1" />'s <see cref="P:System.Span`1.Length" /> will be equal to the number returned by <see cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />.
+             </param>
+             <param name="value">The value.</param>
+        </member>
+        <member name="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)">
+             <summary>
+             Set the immediate children of the value.
+             </summary>
+            
+             <remarks>
+             Callers should ensure that <paramref name="newChildren" /> contains the same number of children as was returned by
+             <see cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />.
+             </remarks>
+            
+             <example>
+             Given a representation of the expression <c>(1+2)+3</c>.
+             <code>
+             Expr expr = new Add(
+                 new Add(
+                     new Lit(1),
+                     new Lit(2)
+                 ),
+                 new Lit(3)
+             );
+             </code>
+             <see cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" /> replaces the immediate children of the topmost node.
+             <code>
+             Expr expected = new Add(
+                 new Lit(4),
+                 new Lit(5)
+             );
+             Assert.Equal(expected, rewriter.SetChildren(Children.Two(new Lit(4), new Lit(5)), expr));
+             </code>
+             </example>
+            
+             <seealso cref="M:Sawmill.IRewritable`1.SetChildren(System.ReadOnlySpan{`0})" />
+             <param name="newChildren">The new children.</param>
+             <param name="value">The old value, whose immediate children should be replaced.</param>
+             <returns>A copy of <paramref name="value" /> with updated children.</returns>
+        </member>
+        <member name="M:Sawmill.PooledQueue`1.AllocateRight(System.Int32)">
+            <summary>
+            Make sure to discard the Span before the next AllocateRight call.
+            </summary>
+            <param name="count">The amount to allocate.</param>
+            <returns>A span.</returns>
+        </member>
+        <member name="T:Sawmill.Rewritable">
+            <summary>
+            Extension methods for <see cref="T:Sawmill.IRewritable`1" /> implementations.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Rewritable.GetChildren``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.GetChildren``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.DescendantsAndSelf``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantsAndSelf``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.SelfAndDescendants``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.SelfAndDescendantsBreadthFirst``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsBreadthFirst``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.ChildrenInContext``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.ChildrenInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.SelfAndDescendantsInContext``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.DescendantsAndSelfInContext``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantsAndSelfInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.SelfAndDescendantsInContextBreadthFirst``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsInContextBreadthFirst``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.DescendantAt``1(``0,System.Collections.Generic.IEnumerable{Sawmill.Direction})">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.ReplaceDescendantAt``1(``0,System.Collections.Generic.IEnumerable{Sawmill.Direction},``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.ReplaceDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0,``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.RewriteDescendantAt``1(``0,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.RewriteDescendantAt``1(``0,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.Cursor``1(``0)">
+            <inheritdoc cref="M:Sawmill.Rewriter.Cursor``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.Fold``2(``0,Sawmill.SpanFunc{``1,``0,``1})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Fold``2(Sawmill.IRewriter{``0},Sawmill.SpanFunc{``1,``0,``1},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.Fold``2(``0,System.Func{System.Memory{``1},``0,System.Threading.Tasks.ValueTask{``1}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Fold``2(Sawmill.IRewriter{``0},System.Func{System.Memory{``1},``0,System.Threading.Tasks.ValueTask{``1}},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.ZipFold``2(``0[],System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" />
+        </member>
+        <member name="M:Sawmill.Rewritable.ZipFold``2(``0[],System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" />
+        </member>
+        <member name="M:Sawmill.Rewritable.ZipFold``2(``0,``0,System.Func{``0,``0,System.Collections.Generic.IEnumerable{``1},``1})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" />
+        </member>
+        <member name="M:Sawmill.Rewritable.ZipFold``2(``0,``0,System.Func{``0,``0,System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" />
+        </member>
+        <member name="M:Sawmill.Rewritable.Rewrite``1(``0,System.Func{``0,``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.Rewrite``1(``0,System.Func{``0,System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.RewriteChildren``1(``0,System.Func{``0,``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.RewriteChildren``1(``0,System.Func{``0,System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.RewriteIter``1(``0,System.Func{``0,``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Rewritable.RewriteIter``1(``0,System.Func{``0,System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="T:Sawmill.RewritableRewriter`1">
+            <summary>
+            An implementation of <see cref="T:Sawmill.IRewriter`1" /> for <typeparamref name="T" />s which implement <see cref="T:Sawmill.IRewritable`1" />.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+        </member>
+        <member name="M:Sawmill.RewritableRewriter`1.#ctor">
+            <summary>
+            Create an instance of <see cref="T:Sawmill.RewritableRewriter`1" />.
+            </summary>
+        </member>
+        <member name="M:Sawmill.RewritableRewriter`1.CountChildren(`0)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />.
+            </summary>
+            <param name="value">The rewritable tree.</param>
+            <returns>The <paramref name="value" />'s number of immediate children.</returns>
+        </member>
+        <member name="M:Sawmill.RewritableRewriter`1.GetChildren(System.Span{`0},`0)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />.
+            </summary>
+            <param name="childrenReceiver">
+            A <see cref="T:System.Span`1" /> to copy the current instance's immediate children into.
+            The <see cref="T:System.Span`1" />'s <see cref="P:System.Span`1.Length" /> should be equal to the number returned by <see cref="M:Sawmill.RewritableRewriter`1.CountChildren(`0)" />.
+            </param>
+            <param name="value">The rewritable tree.</param>
+        </member>
+        <member name="M:Sawmill.RewritableRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />.
+            </summary>
+            <param name="newChildren">The new children.</param>
+            <param name="value">The rewritable tree.</param>
+            <returns>A copy of <paramref name="value" /> with updated children.</returns>
+        </member>
+        <member name="P:Sawmill.RewritableRewriter`1.Instance">
+            <summary>
+            Gets the single global instance of <see cref="T:Sawmill.RewritableRewriter`1" />.
+            </summary>
+        </member>
+        <member name="T:Sawmill.Rewriter">
+            <summary>
+            Extension methods for <see cref="T:Sawmill.IRewriter`1" /> implementations.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Rewriter.ChildrenInContext``1(Sawmill.IRewriter{``0},``0)">
+             <summary>
+             Returns an array containing each immediate child of
+             <paramref name="value" /> paired with a function to replace the child.
+             This is typically useful when you need to replace a node's children one at a time,
+             such as during mutation testing.
+             </summary>
+            
+             <remarks>
+             The replacement function can be seen as the "context" of the child; calling the
+             function with a new child "plugs the hole" in the context.
+             </remarks>
+            
+             <seealso cref="M:Sawmill.Rewriter.SelfAndDescendantsInContext``1(Sawmill.IRewriter{``0},``0)" />
+             <seealso cref="M:Sawmill.Rewriter.DescendantsAndSelfInContext``1(Sawmill.IRewriter{``0},``0)" />
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="value">The value to get the contexts for the immediate children.</param>
+             <returns>An enumerable of contexts.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.Cursor``1(Sawmill.IRewriter{``0},``0)">
+            <summary>
+            Create a <see cref="M:Sawmill.Rewriter.Cursor``1(Sawmill.IRewriter{``0},``0)" /> focused on the root node of <paramref name="value" />.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="value">The root node on which the newly created <see cref="M:Sawmill.Rewriter.Cursor``1(Sawmill.IRewriter{``0},``0)" /> should be focused.</param>
+            <returns>A <see cref="M:Sawmill.Rewriter.Cursor``1(Sawmill.IRewriter{``0},``0)" /> focused on the root node of <paramref name="value" />.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.DescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0)">
+            <summary>
+            Returns the descendant at a particular location in <paramref name="value" />.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="path">The route to take to find the descendant.</param>
+            <param name="value">The rewritable tree.</param>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown if <paramref name="path" /> leads off the edge of the tree.
+            </exception>
+            <returns>The descendant found by following the directions in <paramref name="path" />.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.ReplaceDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0,``0)">
+            <summary>
+            Replaces the descendant at a particular location in <paramref name="value" />.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="path">The route to take to find the descendant.</param>
+            <param name="newDescendant">The replacement descendant.</param>
+            <param name="value">The rewritable tree.</param>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown if <paramref name="path" /> leads off the edge of the tree.
+            </exception>
+            <returns>
+            A copy of <paramref name="value" /> with <paramref name="newDescendant" /> placed at the location indicated by <paramref name="path" />.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,``0},``0)">
+            <summary>
+            Apply a function at a particular location in <paramref name="value" />.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="path">The route to take to find the descendant.</param>
+            <param name="transformer">A function to calculate a replacement for the descendant.</param>
+            <param name="value">The rewritable tree.</param>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown if <paramref name="path" /> leads off the edge of the tree.
+            </exception>
+            <returns>
+            A copy of <paramref name="value" /> with the result of <paramref name="transformer" /> placed at the location indicated by <paramref name="path" />.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)">
+            <summary>
+            Apply an asynchronous function at a particular location in <paramref name="value" />.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="path">The route to take to find the descendant.</param>
+            <param name="transformer">An asynchronous function to calculate a replacement for the descendant.</param>
+            <param name="value">The rewritable tree.</param>
+            <exception cref="T:System.InvalidOperationException">
+            Thrown if <paramref name="path" /> leads off the edge of the tree.
+            </exception>
+            <returns>
+            A copy of <paramref name="value" /> with the result of <paramref name="transformer" /> placed at the location indicated by <paramref name="path" />.
+            </returns>
+            <remarks>This method is not available on platforms which do not support <see cref="T:System.Threading.Tasks.ValueTask" />.</remarks>
+        </member>
+        <member name="M:Sawmill.Rewriter.DescendantsAndSelf``1(Sawmill.IRewriter{``0},``0)">
+             <summary>
+             Yields all of the nodes in the tree represented by <paramref name="value" />, starting at the bottom.
+             </summary>
+            
+             <remarks>
+             This is a depth-first post-order traversal.
+             </remarks>
+            
+             <example>
+             <code>
+             Expr expr = new Add(
+                 new Add(
+                     new Lit(1),
+                     new Lit(2)
+                 ),
+                 new Lit(3)
+             );
+             Expr[] expected = new[]
+                 {
+                     new Lit(1),
+                     new Lit(2),
+                     new Add(new Lit(1), new Lit(2)),
+                     new Lit(3),
+                     expr
+                 };
+             Assert.Equal(expected, rewriter.DescendantsAndSelf(expr));
+             </code>
+             </example>
+            
+             <seealso cref="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)" />
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="value">The value to traverse.</param>
+             <returns>An enumerable containing all of the nodes in the tree represented by <paramref name="value" />, starting at the bottom.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.DescendantsAndSelfInContext``1(Sawmill.IRewriter{``0},``0)">
+             <summary>
+             Yields each node in the tree represented by <paramref name="value" />
+             paired with a function to replace the node, starting at the bottom.
+             This is typically useful when you need to replace nodes one at a time,
+             such as during mutation testing.
+             </summary>
+            
+             <remarks>
+             <para>
+             The replacement function can be seen as the "context" of the node; calling the
+             function with a new node "plugs the hole" in the context.
+             </para>
+            
+             <para>
+             This is a depth-first post-order traversal.
+             </para>
+             </remarks>
+            
+             <seealso cref="M:Sawmill.Rewriter.DescendantsAndSelf``1(Sawmill.IRewriter{``0},``0)" />
+             <seealso cref="M:Sawmill.Rewriter.ChildrenInContext``1(Sawmill.IRewriter{``0},``0)" />
+             <seealso cref="M:Sawmill.Rewriter.SelfAndDescendantsInContext``1(Sawmill.IRewriter{``0},``0)" />
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="value">The value to get the contexts for the descendants.</param>
+             <returns>An enumerable of contexts.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.Fold``2(Sawmill.IRewriter{``0},Sawmill.SpanFunc{``1,``0,``1},``0)">
+            <summary>
+            Flattens all the nodes in the tree represented by <paramref name="value" /> into a single result,
+            using an aggregation function to combine each node with the results of folding its children.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <typeparam name="U">The type of the result of aggregation.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="func">The aggregation function.</param>
+            <param name="value">The value to fold.</param>
+            <returns>The result of aggregating the tree represented by <paramref name="value" />.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.Fold``2(Sawmill.IRewriter{``0},System.Func{System.Memory{``1},``0,System.Threading.Tasks.ValueTask{``1}},``0)">
+            <summary>
+            Flattens all the nodes in the tree represented by <paramref name="value" /> into a single result,
+            using an asynchronous aggregation function to combine each node with the results of folding its children.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <typeparam name="U">The type of the result of aggregation.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="func">The asynchronous aggregation function.</param>
+            <param name="value">The value to fold.</param>
+            <returns>The result of aggregating the tree represented by <paramref name="value" />.</returns>
+            <remarks>This method is not available on platforms which do not support <see cref="T:System.Threading.Tasks.ValueTask" />.</remarks>
+        </member>
+        <member name="M:Sawmill.Rewriter.GetChildren``1(Sawmill.IRewriter{``0},``0)">
+            <summary>
+            Get the immediate children of the value.
+            </summary>
+            <example>
+            Given a representation of the expression <c>(1+2)+3</c>.
+            <code>
+            Expr expr = new Add(
+                new Add(
+                    new Lit(1),
+                    new Lit(2)
+                ),
+                new Lit(3)
+            );
+            </code>
+            <see cref="M:Sawmill.Rewriter.GetChildren``1(Sawmill.IRewriter{``0},``0)" /> returns the immediate children of the topmost node.
+            <code>
+            Expr[] expected = new[]
+                {
+                    new Add(
+                        new Lit(1),
+                        new Lit(2)
+                    ),
+                    new Lit(3)
+                };
+            Assert.Equal(expected, rewriter.GetChildren(expr));
+            </code>
+            </example>
+            <seealso cref="M:Sawmill.IRewritable`1.GetChildren(System.Span{`0})" />
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="value">The value.</param>
+            <returns>The immediate children of <paramref name="value" />.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)">
+            <summary>
+            Rebuild a tree by applying a transformation function to every node from bottom to top.
+            </summary>
+            <example>
+            Given a representation of the expression <c>(1+2)+3</c>.
+            <code>
+            Expr expr = new Add(
+                new Add(
+                    new Lit(1),
+                    new Lit(2)
+                ),
+                new Lit(3)
+            );
+            </code>
+            <see cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" /> replaces the leaves of the tree with the result of calling <paramref name="transformer" />,
+            then replaces their parents with the result of calling <paramref name="transformer" />, and so on.
+            By the end, <see cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" /> has traversed the whole tree.
+            <code>
+            Expr expected = transformer(new Add(
+                transformer(new Add(
+                    transformer(new Lit(1)),
+                    transformer(new Lit(2))
+                )),
+                transformer(new Lit(3))
+            ));
+            Assert.Equal(expected, rewriter.Rewrite(transformer, expr));
+            </code>
+            </example>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="transformer">The transformation function to apply to every node in the tree.</param>
+            <param name="value">The value to rewrite.</param>
+            <returns>
+            The result of applying <paramref name="transformer" /> to every node in the tree represented by <paramref name="value" />.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)">
+            <summary>
+            Rebuild a tree by applying an asynchronous transformation function to every node from bottom to top.
+            </summary>
+            <example>
+            Given a representation of the expression <c>(1+2)+3</c>.
+            <code>
+            Expr expr = new Add(
+                new Add(
+                    new Lit(1),
+                    new Lit(2)
+                ),
+                new Lit(3)
+            );
+            </code>
+            <see cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" /> replaces the leaves of the tree with the result of calling <paramref name="transformer" />,
+            then replaces their parents with the result of calling <paramref name="transformer" />, and so on.
+            By the end, <see cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" /> has traversed the whole tree.
+            <code>
+            Expr expected = await transformer(new Add(
+                await transformer(new Add(
+                    await transformer(new Lit(1)),
+                    await transformer(new Lit(2))
+                )),
+                await transformer(new Lit(3))
+            ));
+            Assert.Equal(expected, await rewriter.Rewrite(transformer, expr));
+            </code>
+            </example>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="transformer">The asynchronous transformation function to apply to every node in the tree.</param>
+            <param name="value">The value to rewrite.</param>
+            <returns>
+            The result of applying <paramref name="transformer" /> to every node in the tree represented by <paramref name="value" />.
+            </returns>
+            <remarks>This method is not available on platforms which do not support <see cref="T:System.Threading.Tasks.ValueTask" />.</remarks>
+        </member>
+        <member name="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)">
+            <summary>
+            Update the immediate children of the value by applying a transformation function to each one.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="transformer">A transformation function to apply to each of <paramref name="value" />'s immediate children.</param>
+            <param name="value">The old value, whose immediate children should be transformed by <paramref name="transformer" />.</param>
+            <returns>A copy of <paramref name="value" /> with updated children.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)">
+            <summary>
+            Update the immediate children of the value by applying an asynchronous transformation function to each one.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="transformer">An asynchronous transformation function to apply to each of <paramref name="value" />'s immediate children.</param>
+            <param name="value">The old value, whose immediate children should be transformed by <paramref name="transformer" />.</param>
+            <returns>A copy of <paramref name="value" /> with updated children.</returns>
+            <remarks>This method is not available on platforms which do not support <see cref="T:System.Threading.Tasks.ValueTask" />.</remarks>
+        </member>
+        <member name="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)">
+            <summary>
+            Rebuild a tree by repeatedly applying a transformation function to every node in the tree,
+            until a fixed point is reached. <paramref name="transformer" /> should always eventually return
+            its argument unchanged, or this method will loop.
+            That is, <c>x.RewriteIter(transformer).SelfAndDescendants().All(x => transformer(x) == x)</c>.
+            <para>
+            This is typically useful when you want to put your tree into a normal form
+            by applying a collection of rewrite rules until none of them can fire any more.
+            </para>
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="transformer">
+            A transformation function to apply to every node in <paramref name="value" /> repeatedly.
+            </param>
+            <param name="value">The value to rewrite.</param>
+            <returns>
+            The result of applying <paramref name="transformer" /> to every node in the tree
+            represented by <paramref name="value" /> repeatedly until a fixed point is reached.
+            </returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)">
+            <summary>
+            Rebuild a tree by repeatedly applying an asynchronous transformation function to every node in the tree,
+            until a fixed point is reached. <paramref name="transformer" /> should always eventually return
+            its argument unchanged, or this method will loop.
+            That is, <c>x.RewriteIter(transformer).SelfAndDescendants().All(x => await transformer(x) == x)</c>.
+            <para>
+            This is typically useful when you want to put your tree into a normal form
+            by applying a collection of rewrite rules until none of them can fire any more.
+            </para>
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <param name="rewriter">The rewriter.</param>
+            <param name="transformer">
+            An asynchronous transformation function to apply to every node in <paramref name="value" /> repeatedly.
+            </param>
+            <param name="value">The value to rewrite.</param>
+            <returns>
+            The result of applying <paramref name="transformer" /> to every node in the tree
+            represented by <paramref name="value" /> repeatedly until a fixed point is reached.
+            </returns>
+            <remarks>This method is not available on platforms which do not support <see cref="T:System.Threading.Tasks.ValueTask" />.</remarks>
+        </member>
+        <member name="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)">
+             <summary>
+             Yields all of the nodes in the tree represented by <paramref name="value" />, starting at the top.
+             </summary>
+            
+             <remarks>
+             This is a depth-first pre-order traversal.
+             </remarks>
+            
+             <example>
+             <code>
+             Expr expr = new Add(
+                 new Add(
+                     new Lit(1),
+                     new Lit(2)
+                 ),
+                 new Lit(3)
+             );
+             Expr[] expected = new[]
+                 {
+                     expr,
+                     new Add(new Lit(1), new Lit(2)),
+                     new Lit(1),
+                     new Lit(2),
+                     new Lit(3),
+                 };
+             Assert.Equal(expected, rewriter.SelfAndDescendants(expr));
+             </code>
+             </example>
+            
+             <seealso cref="M:Sawmill.Rewriter.DescendantsAndSelf``1(Sawmill.IRewriter{``0},``0)" />
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="value">The value to traverse.</param>
+             <returns>An enumerable containing all of the nodes in the tree represented by <paramref name="value" />, starting at the top.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.SelfAndDescendantsBreadthFirst``1(Sawmill.IRewriter{``0},``0)">
+             <summary>
+             Yields all of the nodes in the tree represented by <paramref name="value" /> in a breadth-first traversal order.
+            
+             <para>
+             This is a breadth-first pre-order traversal.
+             </para>
+            
+             </summary>
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="value">The value to traverse.</param>
+             <returns>An enumerable containing all of the nodes in the tree represented by <paramref name="value" /> in a breadth-first traversal order.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.SelfAndDescendantsInContext``1(Sawmill.IRewriter{``0},``0)">
+             <summary>
+             Yields each node in the tree represented by <paramref name="value" />
+             paired with a function to replace the node, starting at the top.
+             This is typically useful when you need to replace nodes one at a time,
+             such as during mutation testing.
+             </summary>
+            
+             <remarks>
+             <para>
+             The replacement function can be seen as the "context" of the node; calling the
+             function with a new node "plugs the hole" in the context.
+             </para>
+            
+             <para>
+             This is a depth-first pre-order traversal.
+             </para>
+             </remarks>
+            
+             <seealso cref="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)" />
+             <seealso cref="M:Sawmill.Rewriter.ChildrenInContext``1(Sawmill.IRewriter{``0},``0)" />
+             <seealso cref="M:Sawmill.Rewriter.DescendantsAndSelfInContext``1(Sawmill.IRewriter{``0},``0)" />
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="value">The value to get the contexts for the descendants.</param>
+             <returns>An enumerable of contexts.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.SelfAndDescendantsInContextBreadthFirst``1(Sawmill.IRewriter{``0},``0)">
+             <summary>
+             Yields each node in the tree represented by <paramref name="value" />
+             paired with a function to replace the node, in a breadth-first traversal order.
+             This is typically useful when you need to replace nodes one at a time,
+             such as during mutation testing.
+             </summary>
+            
+             <remarks>
+             <para>
+             The replacement function can be seen as the "context" of the node; calling the
+             function with a new node "plugs the hole" in the context.
+             </para>
+            
+             <para>
+             This is a breadth-first pre-order traversal.
+             </para>
+             </remarks>
+            
+             <seealso cref="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)" />
+             <seealso cref="M:Sawmill.Rewriter.ChildrenInContext``1(Sawmill.IRewriter{``0},``0)" />
+             <seealso cref="M:Sawmill.Rewriter.DescendantsAndSelfInContext``1(Sawmill.IRewriter{``0},``0)" />
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="value">The value to get the contexts for the descendants.</param>
+             <returns>An enumerable of contexts.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])">
+             <summary>
+             Flatten all of the nodes in the trees represented by <paramref name="values" />
+             into a single value at the same time, using an aggregation function to combine
+             nodes with the results of aggregating their children.
+             The trees are iterated in lock-step, much like an n-ary
+             <see cref="M:System.Linq.Enumerable.Zip``3(System.Collections.Generic.IEnumerable{``0},System.Collections.Generic.IEnumerable{``1},System.Func{``0,``1,``2})" />.
+            
+             When trees are not the same size, the larger ones are
+             truncated both horizontally and vertically.
+             That is, if a pair of nodes have a different number of children,
+             the rightmost children of the larger of the two nodes are discarded.
+             </summary>
+             <example>
+             Here's an example of using <see cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" /> to test if two trees are syntactically equal.
+             <code>
+             static bool Equals(this Expr left, Expr right)
+                 =&gt; left.ZipFold&lt;Expr, bool&gt;(
+                     right,
+                     (xs, results) =&gt;
+                     {
+                         switch (xs[0])
+                         {
+                             case Add a1 when xs[1] is Add a2:
+                                 return results.All(x =&gt; x);
+                             case Lit l1 when xs[1] is Lit l2:
+                                 return l1.Value == l2.Value;
+                             default:
+                                 return false;
+                         }
+                     }
+                 );
+             </code>
+             </example>
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <typeparam name="U">The return type of the aggregation.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="func">The aggregation function.</param>
+             <param name="values">The trees to fold.</param>
+             <returns>The result of aggregating the two trees.</returns>
+        </member>
+        <member name="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])">
+             <summary>
+             Flatten all of the nodes in the trees represented by <paramref name="values" />
+             into a single value at the same time, using an aggregation function to combine
+             nodes with the results of aggregating their children.
+             The trees are iterated in lock-step, much like an n-ary
+             <see cref="M:System.Linq.Enumerable.Zip``3(System.Collections.Generic.IEnumerable{``0},System.Collections.Generic.IEnumerable{``1},System.Func{``0,``1,``2})" />.
+            
+             When trees are not the same size, the larger ones are
+             truncated both horizontally and vertically.
+             That is, if a pair of nodes have a different number of children,
+             the rightmost children of the larger of the two nodes are discarded.
+             </summary>
+             <example>
+             Here's an example of using <see cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" /> to test if two trees are syntactically equal.
+             <code>
+             static bool Equals(this Expr left, Expr right)
+                 =&gt; left.ZipFold&lt;Expr, bool&gt;(
+                     right,
+                     (xs, results) =&gt;
+                     {
+                         switch (xs[0])
+                         {
+                             case Add a1 when xs[1] is Add a2:
+                                 return results.All(x =&gt; x);
+                             case Lit l1 when xs[1] is Lit l2:
+                                 return l1.Value == l2.Value;
+                             default:
+                                 return false;
+                         }
+                     }
+                 );
+             </code>
+             </example>
+             <typeparam name="T">The rewritable tree type.</typeparam>
+             <typeparam name="U">The return type of the aggregation.</typeparam>
+             <param name="rewriter">The rewriter.</param>
+             <param name="func">The aggregation function.</param>
+             <param name="values">The trees to fold.</param>
+             <returns>The result of aggregating the two trees.</returns>
+             <remarks>
+             This method is not available on platforms which do not support <see cref="T:System.Threading.Tasks.ValueTask" /> and <see cref="T:System.Collections.Generic.IAsyncEnumerable`1" />.
+             </remarks>
+        </member>
+        <member name="T:Sawmill.RewriterBuilder">
+            <summary>
+            Tools for building rewriters.
+            </summary>
+        </member>
+        <member name="M:Sawmill.RewriterBuilder.For``1">
+            <summary>
+            Create a new <see cref="T:Sawmill.RewriterBuilder`1" />.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+            <returns>A <see cref="T:Sawmill.RewriterBuilder`1" />.</returns>
+        </member>
+        <member name="T:Sawmill.RewriterBuilder`1">
+            <summary>
+            Tools for building rewriters.
+            </summary>
+            <typeparam name="T">The rewritable tree type.</typeparam>
+        </member>
+        <member name="M:Sawmill.RewriterBuilder`1.Case``1(System.Func{Sawmill.RewriterBuilderCase{System.Object,`0,``0},Sawmill.IRewriter{`0}})">
+            <summary>
+            Handle a single subclass of <typeparamref name="T" />.
+            </summary>
+            <typeparam name="TSub">The concrete subclass type.</typeparam>
+            <param name="builderAction">The action defining the builder for this subclass.</param>
+            <returns>A <see cref="T:Sawmill.RewriterBuilder`1" />.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilder`1.Build">
+            <summary>
+            Build a rewriter.
+            </summary>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="T:Sawmill.RewriterBuilderCase`3">
+            <summary>
+            Tools for building rewriters for a single subclass of a base type.
+            </summary>
+            <typeparam name="TArgs">The constructor arguments.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The sublcass which this case handles.</typeparam>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase`3.Field``1(System.Func{`2,``0})">
+            <summary>
+            Select a field from the subclass.
+            </summary>
+            <typeparam name="U">The field type.</typeparam>
+            <param name="field">The field selector.</param>
+            <returns>A copy of this <see cref="T:Sawmill.RewriterBuilderCase" /> with an additional constructor argument.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase`3.Child(System.Func{`2,`1})">
+            <summary>
+            Select an immediate child.
+            </summary>
+            <param name="child">The child selector.</param>
+            <returns>A copy of this <see cref="T:Sawmill.RewriterBuilderCase" /> with an additional constructor argument.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase`3.Children(System.Func{`2,System.Collections.Immutable.ImmutableList{`1}})">
+            <summary>
+            Select a list of children.
+            </summary>
+            <param name="children">The children selector.</param>
+            <returns>A copy of this <see cref="T:Sawmill.RewriterBuilderCase" /> with an additional constructor argument.</returns>
+        </member>
+        <member name="T:Sawmill.RewriterBuilderCase">
+            <summary>
+            Tools for building rewriters for a single subclass of a base type.
+            </summary>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``3(Sawmill.RewriterBuilderCase{``0,``1,``2},System.Func{``0,``2})">
+            <summary>
+            Rebuild the subtype with the supplied function.
+            </summary>
+            <typeparam name="T">The arguments of the builder.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``2(Sawmill.RewriterBuilderCase{System.Object,``0,``1},System.Func{``1})">
+            <summary>
+            Rebuild the subtype with the supplied function.
+            </summary>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``3(Sawmill.RewriterBuilderCase{System.ValueTuple{System.Object,``0},``1,``2},System.Func{``0,``2})">
+            <summary>
+            Rebuild the subtype with the supplied function, after flattening the tuple.
+            </summary>
+            <typeparam name="U1">Constructor argument 1.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``4(Sawmill.RewriterBuilderCase{System.ValueTuple{System.ValueTuple{System.Object,``0},``1},``2,``3},System.Func{``0,``1,``3})">
+            <summary>
+            Rebuild the subtype with the supplied function, after flattening the tuple.
+            </summary>
+            <typeparam name="U1">Constructor argument 1.</typeparam>
+            <typeparam name="U2">Constructor argument 2.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``5(Sawmill.RewriterBuilderCase{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.Object,``0},``1},``2},``3,``4},System.Func{``0,``1,``2,``4})">
+            <summary>
+            Rebuild the subtype with the supplied function, after flattening the tuple.
+            </summary>
+            <typeparam name="U1">Constructor argument 1.</typeparam>
+            <typeparam name="U2">Constructor argument 2.</typeparam>
+            <typeparam name="U3">Constructor argument 3.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``6(Sawmill.RewriterBuilderCase{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.Object,``0},``1},``2},``3},``4,``5},System.Func{``0,``1,``2,``3,``5})">
+            <summary>
+            Rebuild the subtype with the supplied function, after flattening the tuple.
+            </summary>
+            <typeparam name="U1">Constructor argument 1.</typeparam>
+            <typeparam name="U2">Constructor argument 2.</typeparam>
+            <typeparam name="U3">Constructor argument 3.</typeparam>
+            <typeparam name="U4">Constructor argument 4.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``7(Sawmill.RewriterBuilderCase{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.Object,``0},``1},``2},``3},``4},``5,``6},System.Func{``0,``1,``2,``3,``4,``6})">
+            <summary>
+            Rebuild the subtype with the supplied function, after flattening the tuple.
+            </summary>
+            <typeparam name="U1">Constructor argument 1.</typeparam>
+            <typeparam name="U2">Constructor argument 2.</typeparam>
+            <typeparam name="U3">Constructor argument 3.</typeparam>
+            <typeparam name="U4">Constructor argument 4.</typeparam>
+            <typeparam name="U5">Constructor argument 5.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``8(Sawmill.RewriterBuilderCase{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.Object,``0},``1},``2},``3},``4},``5},``6,``7},System.Func{``0,``1,``2,``3,``4,``5,``7})">
+            <summary>
+            Rebuild the subtype with the supplied function, after flattening the tuple.
+            </summary>
+            <typeparam name="U1">Constructor argument 1.</typeparam>
+            <typeparam name="U2">Constructor argument 2.</typeparam>
+            <typeparam name="U3">Constructor argument 3.</typeparam>
+            <typeparam name="U4">Constructor argument 4.</typeparam>
+            <typeparam name="U5">Constructor argument 5.</typeparam>
+            <typeparam name="U6">Constructor argument 6.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``9(Sawmill.RewriterBuilderCase{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.Object,``0},``1},``2},``3},``4},``5},``6},``7,``8},System.Func{``0,``1,``2,``3,``4,``5,``6,``8})">
+            <summary>
+            Rebuild the subtype with the supplied function, after flattening the tuple.
+            </summary>
+            <typeparam name="U1">Constructor argument 1.</typeparam>
+            <typeparam name="U2">Constructor argument 2.</typeparam>
+            <typeparam name="U3">Constructor argument 3.</typeparam>
+            <typeparam name="U4">Constructor argument 4.</typeparam>
+            <typeparam name="U5">Constructor argument 5.</typeparam>
+            <typeparam name="U6">Constructor argument 6.</typeparam>
+            <typeparam name="U7">Constructor argument 7.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="M:Sawmill.RewriterBuilderCase.ConstructWith``10(Sawmill.RewriterBuilderCase{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.ValueTuple{System.Object,``0},``1},``2},``3},``4},``5},``6},``7},``8,``9},System.Func{``0,``1,``2,``3,``4,``5,``6,``7,``9})">
+            <summary>
+            Rebuild the subtype with the supplied function, after flattening the tuple.
+            </summary>
+            <typeparam name="U1">Constructor argument 1.</typeparam>
+            <typeparam name="U2">Constructor argument 2.</typeparam>
+            <typeparam name="U3">Constructor argument 3.</typeparam>
+            <typeparam name="U4">Constructor argument 4.</typeparam>
+            <typeparam name="U5">Constructor argument 5.</typeparam>
+            <typeparam name="U6">Constructor argument 6.</typeparam>
+            <typeparam name="U7">Constructor argument 7.</typeparam>
+            <typeparam name="U8">Constructor argument 8.</typeparam>
+            <typeparam name="TBase">The rewritable tree type.</typeparam>
+            <typeparam name="TSub">The subtype.</typeparam>
+            <param name="builder">The builder.</param>
+            <param name="constructor">The constructor function.</param>
+            <returns>A rewriter.</returns>
+        </member>
+        <member name="T:Sawmill.SpanFunc`3">
+            <summary>
+            A <see cref="T:System.Func`3" /> whose first argument is a <see cref="T:System.Span`1" />.
+            </summary>
+            <param name="span">The span.</param>
+            <param name="arg">An additional argument.</param>
+            <typeparam name="T">The type of elements in the span.</typeparam>
+            <typeparam name="U">The type of the additional argument.</typeparam>
+            <typeparam name="R">The return type.</typeparam>
+            <returns>A value of type <typeparamref name="R" />.</returns>
+        </member>
+        <member name="T:Sawmill.Xml.XElementExtensions">
+            <summary>
+            Extension methods for <see cref="T:System.Xml.Linq.XElement" />s.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.CountChildren(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.GetChildren(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.GetChildren``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.GetChildren(System.Xml.Linq.XElement,System.Span{System.Xml.Linq.XElement})">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.SetChildren(System.Xml.Linq.XElement,System.ReadOnlySpan{System.Xml.Linq.XElement})">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.DescendantsAndSelf(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantsAndSelf``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.SelfAndDescendants(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.SelfAndDescendantsBreadthFirst(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsBreadthFirst``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.ChildrenInContext(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.ChildrenInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.SelfAndDescendantsInContext(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.DescendantsAndSelfInContext(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantsAndSelfInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.SelfAndDescendantsInContextBreadthFirst(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsInContextBreadthFirst``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.DescendantAt(System.Xml.Linq.XElement,System.Collections.Generic.IEnumerable{Sawmill.Direction})">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.ReplaceDescendantAt``1(System.Xml.Linq.XElement,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.ReplaceDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0,``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.RewriteDescendantAt``1(System.Xml.Linq.XElement,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{System.Xml.Linq.XElement,System.Xml.Linq.XElement})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.RewriteDescendantAt``1(System.Xml.Linq.XElement,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{System.Xml.Linq.XElement,System.Threading.Tasks.ValueTask{System.Xml.Linq.XElement}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.Cursor(System.Xml.Linq.XElement)">
+            <inheritdoc cref="M:Sawmill.Rewriter.Cursor``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.Fold``1(System.Xml.Linq.XElement,Sawmill.SpanFunc{``0,System.Xml.Linq.XElement,``0})">
+            <inheritdoc cref="M:Sawmill.Rewritable.Fold``2(``0,Sawmill.SpanFunc{``1,``0,``1})" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.Fold``1(System.Xml.Linq.XElement,System.Func{System.Memory{``0},System.Xml.Linq.XElement,System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewritable.Fold``2(``0,System.Func{System.Memory{``1},``0,System.Threading.Tasks.ValueTask{``1}})" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.ZipFold``1(System.Xml.Linq.XElement[],System.Func{System.Xml.Linq.XElement[],System.Collections.Generic.IEnumerable{``0},``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.ZipFold``1(System.Xml.Linq.XElement[],System.Func{System.Xml.Linq.XElement[],System.Collections.Generic.IAsyncEnumerable{``0},System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.ZipFold``1(System.Xml.Linq.XElement,System.Xml.Linq.XElement,System.Func{System.Xml.Linq.XElement,System.Xml.Linq.XElement,System.Collections.Generic.IEnumerable{``0},``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.ZipFold``1(System.Xml.Linq.XElement,System.Xml.Linq.XElement,System.Func{System.Xml.Linq.XElement,System.Xml.Linq.XElement,System.Collections.Generic.IAsyncEnumerable{``0},System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.Rewrite(System.Xml.Linq.XElement,System.Func{System.Xml.Linq.XElement,System.Xml.Linq.XElement})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.Rewrite(System.Xml.Linq.XElement,System.Func{System.Xml.Linq.XElement,System.Threading.Tasks.ValueTask{System.Xml.Linq.XElement}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.RewriteChildren(System.Xml.Linq.XElement,System.Func{System.Xml.Linq.XElement,System.Xml.Linq.XElement})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.RewriteChildren(System.Xml.Linq.XElement,System.Func{System.Xml.Linq.XElement,System.Threading.Tasks.ValueTask{System.Xml.Linq.XElement}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.RewriteIter(System.Xml.Linq.XElement,System.Func{System.Xml.Linq.XElement,System.Xml.Linq.XElement})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XElementExtensions.RewriteIter(System.Xml.Linq.XElement,System.Func{System.Xml.Linq.XElement,System.Threading.Tasks.ValueTask{System.Xml.Linq.XElement}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="T:Sawmill.Xml.XElementRewriter">
+            <summary>
+            An implementation of <see cref="T:Sawmill.IRewriter`1" /> for <see cref="T:System.Xml.Linq.XElement" />s.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Xml.XElementRewriter.#ctor">
+            <summary>
+            Create a new instance of <see cref="T:Sawmill.Xml.XElementRewriter" />.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Xml.XElementRewriter.CountChildren(System.Xml.Linq.XElement)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />.
+            </summary>
+            <param name="value">The value.</param>
+            <returns><paramref name="value" />'s number of immediate children.</returns>
+        </member>
+        <member name="M:Sawmill.Xml.XElementRewriter.GetChildren(System.Span{System.Xml.Linq.XElement},System.Xml.Linq.XElement)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />.
+            </summary>
+            <param name="childrenReceiver">
+            A <see cref="T:System.Span`1" /> to copy <paramref name="value" />'s immediate children into.
+            The <see cref="T:System.Span`1" />'s <see cref="P:System.Span`1.Length" /> will be equal to the number returned by <see cref="M:Sawmill.Xml.XElementRewriter.CountChildren(System.Xml.Linq.XElement)" />.
+            </param>
+            <param name="value">The value.</param>
+        </member>
+        <member name="M:Sawmill.Xml.XElementRewriter.SetChildren(System.ReadOnlySpan{System.Xml.Linq.XElement},System.Xml.Linq.XElement)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />.
+            </summary>
+            <param name="newChildren">The new children.</param>
+            <param name="value">The old value, whose immediate children should be replaced.</param>
+            <returns>A copy of <paramref name="value" /> with updated children.</returns>
+        </member>
+        <member name="P:Sawmill.Xml.XElementRewriter.Instance">
+            <summary>
+            Gets the single global instance of <see cref="T:Sawmill.Xml.XElementRewriter" />.
+            </summary>
+            <returns>The single global instance of <see cref="T:Sawmill.Xml.XElementRewriter" />.</returns>
+        </member>
+        <member name="T:Sawmill.Xml.XmlNodeExtensions">
+            <summary>
+            Extension methods for <see cref="T:System.Xml.XmlNode" />s.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.CountChildren(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.GetChildren(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.GetChildren``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.GetChildren(System.Xml.XmlNode,System.Span{System.Xml.XmlNode})">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.SetChildren(System.Xml.XmlNode,System.ReadOnlySpan{System.Xml.XmlNode})">
+            <inheritdoc cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.DescendantsAndSelf(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantsAndSelf``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.SelfAndDescendants(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendants``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.SelfAndDescendantsBreadthFirst(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsBreadthFirst``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.ChildrenInContext(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.ChildrenInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.SelfAndDescendantsInContext(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.DescendantsAndSelfInContext(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantsAndSelfInContext``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.SelfAndDescendantsInContextBreadthFirst(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.SelfAndDescendantsInContextBreadthFirst``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.DescendantAt(System.Xml.XmlNode,System.Collections.Generic.IEnumerable{Sawmill.Direction})">
+            <inheritdoc cref="M:Sawmill.Rewriter.DescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.ReplaceDescendantAt``1(System.Xml.XmlNode,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.ReplaceDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},``0,``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.RewriteDescendantAt``1(System.Xml.XmlNode,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{System.Xml.XmlNode,System.Xml.XmlNode})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.RewriteDescendantAt``1(System.Xml.XmlNode,System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{System.Xml.XmlNode,System.Threading.Tasks.ValueTask{System.Xml.XmlNode}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteDescendantAt``1(Sawmill.IRewriter{``0},System.Collections.Generic.IEnumerable{Sawmill.Direction},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.Cursor(System.Xml.XmlNode)">
+            <inheritdoc cref="M:Sawmill.Rewriter.Cursor``1(Sawmill.IRewriter{``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.Fold``1(System.Xml.XmlNode,Sawmill.SpanFunc{``0,System.Xml.XmlNode,``0})">
+            <inheritdoc cref="M:Sawmill.Rewritable.Fold``2(``0,Sawmill.SpanFunc{``1,``0,``1})" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.Fold``1(System.Xml.XmlNode,System.Func{System.Memory{``0},System.Xml.XmlNode,System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewritable.Fold``2(``0,System.Func{System.Memory{``1},``0,System.Threading.Tasks.ValueTask{``1}})" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.ZipFold``1(System.Xml.XmlNode[],System.Func{System.Xml.XmlNode[],System.Collections.Generic.IEnumerable{``0},``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.ZipFold``1(System.Xml.XmlNode[],System.Func{System.Xml.XmlNode[],System.Collections.Generic.IAsyncEnumerable{``0},System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.ZipFold``1(System.Xml.XmlNode,System.Xml.XmlNode,System.Func{System.Xml.XmlNode,System.Xml.XmlNode,System.Collections.Generic.IEnumerable{``0},``0})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IEnumerable{``1},``1},``0[])" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.ZipFold``1(System.Xml.XmlNode,System.Xml.XmlNode,System.Func{System.Xml.XmlNode,System.Xml.XmlNode,System.Collections.Generic.IAsyncEnumerable{``0},System.Threading.Tasks.ValueTask{``0}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.ZipFold``2(Sawmill.IRewriter{``0},System.Func{``0[],System.Collections.Generic.IAsyncEnumerable{``1},System.Threading.Tasks.ValueTask{``1}},``0[])" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.Rewrite(System.Xml.XmlNode,System.Func{System.Xml.XmlNode,System.Xml.XmlNode})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.Rewrite(System.Xml.XmlNode,System.Func{System.Xml.XmlNode,System.Threading.Tasks.ValueTask{System.Xml.XmlNode}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.Rewrite``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.RewriteChildren(System.Xml.XmlNode,System.Func{System.Xml.XmlNode,System.Xml.XmlNode})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.RewriteChildren(System.Xml.XmlNode,System.Func{System.Xml.XmlNode,System.Threading.Tasks.ValueTask{System.Xml.XmlNode}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteChildren``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.RewriteIter(System.Xml.XmlNode,System.Func{System.Xml.XmlNode,System.Xml.XmlNode})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,``0},``0)" />
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeExtensions.RewriteIter(System.Xml.XmlNode,System.Func{System.Xml.XmlNode,System.Threading.Tasks.ValueTask{System.Xml.XmlNode}})">
+            <inheritdoc cref="M:Sawmill.Rewriter.RewriteIter``1(Sawmill.IRewriter{``0},System.Func{``0,System.Threading.Tasks.ValueTask{``0}},``0)" />
+        </member>
+        <member name="T:Sawmill.Xml.XmlNodeRewriter">
+            <summary>
+            An implementation of <see cref="T:Sawmill.IRewriter`1" /> for <see cref="T:System.Xml.XmlNode" />s.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeRewriter.#ctor">
+            <summary>
+            Create a new instance of <see cref="T:Sawmill.Xml.XmlNodeRewriter" />.
+            </summary>
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeRewriter.CountChildren(System.Xml.XmlNode)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.CountChildren(`0)" />.
+            </summary>
+            <param name="value">The value.</param>
+            <returns><paramref name="value" />'s number of immediate children.</returns>
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeRewriter.GetChildren(System.Span{System.Xml.XmlNode},System.Xml.XmlNode)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.GetChildren(System.Span{`0},`0)" />.
+            </summary>
+            <param name="childrenReceiver">
+            A <see cref="T:System.Span`1" /> to copy <paramref name="value" />'s immediate children into.
+            The <see cref="T:System.Span`1" />'s <see cref="P:System.Span`1.Length" /> will be equal to the number returned by <see cref="M:Sawmill.Xml.XmlNodeRewriter.CountChildren(System.Xml.XmlNode)" />.
+            </param>
+            <param name="value">The value.</param>
+        </member>
+        <member name="M:Sawmill.Xml.XmlNodeRewriter.SetChildren(System.ReadOnlySpan{System.Xml.XmlNode},System.Xml.XmlNode)">
+            <summary>
+            See <see cref="M:Sawmill.IRewriter`1.SetChildren(System.ReadOnlySpan{`0},`0)" />.
+            </summary>
+            <param name="newChildren">The new children.</param>
+            <param name="value">The old value, whose immediate children should be replaced.</param>
+            <returns>A copy of <paramref name="value" /> with updated children.</returns>
+        </member>
+        <member name="P:Sawmill.Xml.XmlNodeRewriter.Instance">
+            <summary>
+            Gets the single global instance of <see cref="T:Sawmill.Xml.XElementRewriter" />.
+            </summary>
+            <returns>The single global instance of <see cref="T:Sawmill.Xml.XElementRewriter" />.</returns>
+        </member>
+    </members>
+</doc>
