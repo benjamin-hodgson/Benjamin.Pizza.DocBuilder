@@ -4,19 +4,10 @@ using Benjamin.Pizza.DocBuilder;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.AddLogging();
-builder.Services.AddHttpClient<IReferenceLoader, MicrosoftXRefReferenceLoader>();
-builder.Services.AddTransient<IReferenceLoader, MicrosoftXRefReferenceLoader>();
-builder.Services.AddTransient<Func<Documentation, IReferenceLoader>>(s => d =>
-    new ChainedReferenceLoader(
-        new LocalReferenceLoader(d, s.GetRequiredService<ILogger<LocalReferenceLoader>>()),
-        new CachedReferenceLoader(s.GetRequiredService<IReferenceLoader>(), s.GetRequiredService<ILogger<CachedReferenceLoader>>()))
-);
-builder.Services.AddTransient<ReferenceResolver>();
+builder.Services.Configure();
 
 using var app = builder.Build();
 

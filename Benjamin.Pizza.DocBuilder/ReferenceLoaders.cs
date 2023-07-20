@@ -47,6 +47,57 @@ internal sealed class MicrosoftXRefReferenceLoader : IReferenceLoader
     }
 }
 
+internal sealed class FileSystemCachedReferenceLoader : IReferenceLoader
+{
+    private readonly IReferenceLoader _underlying;
+    private readonly ILogger<FileSystemCachedReferenceLoader> _logger;
+
+    public FileSystemCachedReferenceLoader(IReferenceLoader underlying, ILogger<FileSystemCachedReferenceLoader> logger)
+    {
+        _underlying = underlying;
+        _logger = logger;
+    }
+
+    public async Task<Reference.Resolved?> Load(Xref xref)
+    {
+        Directory.CreateDirectory("_cache");
+
+        var path = Path.Combine("_cache", CleanFilePath(xref.Value));
+        if (File.Exists(path))
+        {
+            _logger.LogInformation("Found xref {Xref} in filesystem cache", xref.Value);
+            using var file = File.OpenText(path);
+            var title = await file.ReadLineAsync().ConfigureAwait(false);
+            var url = await file.ReadLineAsync().ConfigureAwait(false);
+
+            if (title == null || url == null)
+            {
+                throw new InvalidOperationException("Bad cache");
+            }
+
+            return new Reference.Resolved(title, new Uri(url));
+        }
+
+        var resolved = await _underlying.Load(xref).ConfigureAwait(false);
+
+        if (resolved != null)
+        {
+            File.WriteAllLines(path, new[] { resolved.Title, resolved.Url.ToString() });
+        }
+
+        return resolved;
+    }
+
+    private static string CleanFilePath(string value)
+        => value
+            .Replace('{', '_')
+            .Replace('}', '_')
+            .Replace('(', '_')
+            .Replace(')', '_')
+            .Replace('`', '_')
+            .Replace(',', '_');
+}
+
 internal sealed class CachedReferenceLoader : IReferenceLoader
 {
     private readonly IReferenceLoader _underlying;
