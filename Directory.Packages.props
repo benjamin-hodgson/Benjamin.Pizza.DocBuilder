@@ -1,23 +1,23 @@
 <Project>
-    <ItemGroup>
-        <PackageVersion Include="Benjamin.Pizza.DocTest" Version="1.0.0" />
-        <PackageVersion Include="coverlet.collector" Version="3.1.2" />
-        <PackageVersion Include="Eighty" Version="2.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
-        <PackageVersion Include="Microsoft.Extensions.Http" Version="7.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Logging" Version="7.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
-        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.3.1" />
-        <PackageVersion Include="Sawmill" Version="3.3.0" />
-        <PackageVersion Include="System.Reflection.MetadataLoadContext" Version="7.0.0" />
-        <PackageVersion Include="System.Text.Json" Version="7.0.3" />
-        <PackageVersion Include="xunit" Version="2.4.2" />
-        <PackageVersion Include="xunit.runner.visualstudio" Version="2.4.5" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <GlobalPackageReference Include="Benjamin.Pizza.BuildScripts" Version="2.1.0" />
-        <GlobalPackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" />
-        <GlobalPackageReference Include="StyleCop.Analyzers" Version="1.1.118" />
-    </ItemGroup>
+  <ItemGroup>
+    <PackageVersion Include="Benjamin.Pizza.DocTest" Version="1.0.0" />
+    <PackageVersion Include="coverlet.collector" Version="3.1.2" />
+    <PackageVersion Include="Eighty" Version="2.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="7.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="7.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.3.1" />
+    <PackageVersion Include="Sawmill" Version="3.3.0" />
+    <PackageVersion Include="Scrutor" Version="4.2.2" />
+    <PackageVersion Include="System.Reflection.MetadataLoadContext" Version="7.0.0" />
+    <PackageVersion Include="System.Text.Json" Version="7.0.3" />
+    <PackageVersion Include="xunit" Version="2.4.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.4.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <GlobalPackageReference Include="Benjamin.Pizza.BuildScripts" Version="2.1.0" />
+    <GlobalPackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" />
+    <GlobalPackageReference Include="StyleCop.Analyzers" Version="1.1.118" />
+  </ItemGroup>
 </Project>

@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Sawmill" />
+    <PackageReference Include="Scrutor" />
     <PackageReference Include="System.Reflection.MetadataLoadContext" />
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
